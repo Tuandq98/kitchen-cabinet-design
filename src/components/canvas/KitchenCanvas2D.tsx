@@ -514,6 +514,7 @@ export const KitchenCanvas2D: React.FC = () => {
 
   // Tính toán dữ liệu hình học 2D theo phân tầng
   const layout2D = calculateLayout2D(layout, activeCabinetTier);
+  layout2DRef.current = layout2D;
 
   // Xử lý zoom bằng con lăn chuột
   const handleWheel = (e: React.WheelEvent) => {
