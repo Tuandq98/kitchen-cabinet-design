@@ -32,9 +32,11 @@ export const RightSidebar: React.FC = () => {
     catalog,
     selectedModuleId,
     selectedCornerId,
+    selectedGapId,
     validationReport,
     setSelectedModuleId,
     setSelectedCornerId,
+    setSelectedGapId,
     toggleCornerOrientation,
     setCornerOrientation,
     updateCornerWidth,
@@ -44,6 +46,8 @@ export const RightSidebar: React.FC = () => {
     updatePlacedModuleCustomWidth,
     autoFitUpperStorage,
     autoFitBaseStorage,
+    autoFillGap,
+    snapEdgeToModules,
     moveModule,
   } = useKitchenStore();
 
@@ -1274,42 +1278,101 @@ export const RightSidebar: React.FC = () => {
         )}
       </div>
 
-      {/* 1.4 BẢNG THỐNG KÊ KHOẢNG TRỐNG TỦ DƯỚI (BASE EMPTY GAPS OVERVIEW) */}
+      {/* 1.4 BẢNG QUẢN LÝ KHOẢNG TRỐNG TỦ DƯỚI (SMART BASE GAP MANAGER) */}
       {layout.placedModules.length > 0 && (
-        <div className="p-3 border-b border-slate-800 bg-slate-950/40 space-y-2.5">
+        <div className="p-3.5 border-b border-slate-800 bg-slate-950/60 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
-              <Ruler className="w-4 h-4 text-sky-400" />
-              <span>Khoảng trống Tủ Dưới</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+              <Ruler className="w-4 h-4 text-cyan-400" />
+              <span>Khoảng Trống Tủ Dưới</span>
             </span>
-            <span className="text-xs font-mono font-black px-2.5 py-1 rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm">
-              Tổng: {totalBaseGapsMm} mm
+            <span
+              className={`text-xs font-mono font-black px-2.5 py-1 rounded-md border shadow-sm ${
+                totalBaseGapsMm > 0
+                  ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40'
+                  : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+              }`}
+            >
+              {totalBaseGapsMm > 0 ? `Tổng: ${totalBaseGapsMm} mm` : '0 mm (Khít 100%)'}
             </span>
           </div>
 
           {allBaseGaps.length > 0 ? (
-            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
-              {allBaseGaps.map((gap, idx) => (
-                <div
-                  key={gap.id}
-                  className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs shadow-sm"
-                >
-                  <span className="text-slate-300 font-medium">
-                    {gap.edgeId === 'edge_A'
-                      ? 'Cạnh A'
-                      : gap.edgeId === 'edge_B'
-                      ? 'Cạnh B'
-                      : 'Cạnh C'}{' '}
-                    • Khoảng #{idx + 1}
-                  </span>
-                  <span className="font-mono font-black text-sm text-sky-300 bg-slate-950 px-2 py-0.5 rounded border border-sky-500/30">
-                    {gap.gapMm} mm
-                  </span>
-                </div>
-              ))}
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-0.5">
+              {allBaseGaps.map((gap, idx) => {
+                const isSelected = selectedGapId === gap.id;
+                const edgeLabel =
+                  gap.edgeId === 'edge_A'
+                    ? 'Cạnh Chính (A)'
+                    : gap.edgeId === 'edge_B'
+                    ? 'Cạnh Trái (B)'
+                    : 'Cạnh Phải (C)';
+
+                return (
+                  <div
+                    key={gap.id}
+                    onClick={() => setSelectedGapId(isSelected ? null : gap.id)}
+                    className={`p-2.5 rounded-xl border transition-all cursor-pointer space-y-2 ${
+                      isSelected
+                        ? 'bg-slate-900/95 border-cyan-400 shadow-md ring-1 ring-cyan-400/40'
+                        : 'bg-slate-950/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900/50'
+                    }`}
+                  >
+                    {/* Header thông số khoảng trống */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                        <span className="text-xs font-bold text-slate-200">
+                          {edgeLabel} • Khoảng #{idx + 1}
+                        </span>
+                      </div>
+                      <span className="font-mono font-black text-xs text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/30">
+                        {gap.gapMm} mm
+                      </span>
+                    </div>
+
+                    {/* Thanh tỷ lệ trực quan */}
+                    <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                      <div
+                        className="h-full bg-gradient-to-r from-cyan-500 to-sky-400 rounded-full"
+                        style={{
+                          width: `${Math.min(100, Math.max(8, (gap.gapMm / 600) * 100))}%`,
+                        }}
+                      />
+                    </div>
+
+                    {/* Nút hành động nhanh thông minh */}
+                    <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          autoFillGap(gap.edgeId, 'base', gap.gapMm);
+                        }}
+                        className="py-1.5 px-2 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold flex items-center justify-center gap-1 transition shadow-sm active:scale-95"
+                        title="Tự động dãn khoang tủ đồ hoặc thêm khoang để lấp kín khoảng trống này"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>⚡ Lấp đầy (Auto-Fit)</span>
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          snapEdgeToModules(gap.edgeId, gap.gapMm);
+                        }}
+                        className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] font-medium flex items-center justify-center gap-1 transition active:scale-95"
+                        title={`Tự động co cạnh tường ${edgeLabel} lại ${gap.gapMm}mm để vừa khít 0mm`}
+                      >
+                        <Ruler className="w-3.5 h-3.5 text-slate-400" />
+                        <span>📏 Thu gọn tường</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
-            <div className="text-xs text-emerald-400 py-1 flex items-center gap-1.5 font-medium">
+            <div className="text-xs text-emerald-400 py-1.5 flex items-center gap-1.5 font-medium bg-emerald-500/10 px-2.5 rounded-lg border border-emerald-500/20">
               <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
               <span>Hệ tủ dưới đã được lấp đầy hoàn hảo (0 mm trống).</span>
             </div>
@@ -1317,42 +1380,101 @@ export const RightSidebar: React.FC = () => {
         </div>
       )}
 
-      {/* 1.5 BẢNG THỐNG KÊ KHOẢNG TRỐNG TỦ TRÊN (EMPTY GAPS OVERVIEW) */}
+      {/* 1.5 BẢNG QUẢN LÝ KHOẢNG TRỐNG TỦ TRÊN (SMART UPPER GAP MANAGER) */}
       {(layout.placedUpperModules || []).length > 0 && (
-        <div className="p-3 border-b border-slate-800 bg-slate-950/40 space-y-2.5">
+        <div className="p-3.5 border-b border-slate-800 bg-slate-950/60 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
               <Ruler className="w-4 h-4 text-amber-400" />
-              <span>Khoảng trống Tủ Trên</span>
+              <span>Khoảng Trống Tủ Trên</span>
             </span>
-            <span className="text-xs font-mono font-black px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm">
-              Tổng: {totalUpperGapsMm} mm
+            <span
+              className={`text-xs font-mono font-black px-2.5 py-1 rounded-md border shadow-sm ${
+                totalUpperGapsMm > 0
+                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                  : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+              }`}
+            >
+              {totalUpperGapsMm > 0 ? `Tổng: ${totalUpperGapsMm} mm` : '0 mm (Khít 100%)'}
             </span>
           </div>
 
           {allUpperGaps.length > 0 ? (
-            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
-              {allUpperGaps.map((gap, idx) => (
-                <div
-                  key={gap.id}
-                  className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs shadow-sm"
-                >
-                  <span className="text-slate-300 font-medium">
-                    {gap.edgeId === 'edge_A'
-                      ? 'Cạnh A'
-                      : gap.edgeId === 'edge_B'
-                      ? 'Cạnh B'
-                      : 'Cạnh C'}{' '}
-                    • Khoảng #{idx + 1}
-                  </span>
-                  <span className="font-mono font-black text-sm text-amber-300 bg-slate-950 px-2 py-0.5 rounded border border-amber-500/30">
-                    {gap.gapMm} mm
-                  </span>
-                </div>
-              ))}
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-0.5">
+              {allUpperGaps.map((gap, idx) => {
+                const isSelected = selectedGapId === gap.id;
+                const edgeLabel =
+                  gap.edgeId === 'edge_A'
+                    ? 'Cạnh Chính (A)'
+                    : gap.edgeId === 'edge_B'
+                    ? 'Cạnh Trái (B)'
+                    : 'Cạnh Phải (C)';
+
+                return (
+                  <div
+                    key={gap.id}
+                    onClick={() => setSelectedGapId(isSelected ? null : gap.id)}
+                    className={`p-2.5 rounded-xl border transition-all cursor-pointer space-y-2 ${
+                      isSelected
+                        ? 'bg-slate-900/95 border-amber-400 shadow-md ring-1 ring-amber-400/40'
+                        : 'bg-slate-950/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900/50'
+                    }`}
+                  >
+                    {/* Header thông số khoảng trống */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        <span className="text-xs font-bold text-slate-200">
+                          {edgeLabel} • Khoảng #{idx + 1}
+                        </span>
+                      </div>
+                      <span className="font-mono font-black text-xs text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30">
+                        {gap.gapMm} mm
+                      </span>
+                    </div>
+
+                    {/* Thanh tỷ lệ trực quan */}
+                    <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                      <div
+                        className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full"
+                        style={{
+                          width: `${Math.min(100, Math.max(8, (gap.gapMm / 600) * 100))}%`,
+                        }}
+                      />
+                    </div>
+
+                    {/* Nút hành động nhanh thông minh */}
+                    <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          autoFillGap(gap.edgeId, 'upper', gap.gapMm);
+                        }}
+                        className="py-1.5 px-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-bold flex items-center justify-center gap-1 transition shadow-sm active:scale-95"
+                        title="Tự động dãn khoang tủ đồ trên UT01 hoặc thêm khoang để lấp kín khoảng trống này"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        <span>⚡ Lấp đầy (Auto-Fit)</span>
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          snapEdgeToModules(gap.edgeId, gap.gapMm);
+                        }}
+                        className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] font-medium flex items-center justify-center gap-1 transition active:scale-95"
+                        title={`Tự động co cạnh tường ${edgeLabel} lại ${gap.gapMm}mm để vừa khít 0mm`}
+                      >
+                        <Ruler className="w-3.5 h-3.5 text-slate-400" />
+                        <span>📏 Thu gọn tường</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
-            <div className="text-xs text-emerald-400 py-1 flex items-center gap-1.5 font-medium">
+            <div className="text-xs text-emerald-400 py-1.5 flex items-center gap-1.5 font-medium bg-emerald-500/10 px-2.5 rounded-lg border border-emerald-500/20">
               <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
               <span>Hệ tủ trên đã được lấp đầy hoàn hảo (0 mm trống).</span>
             </div>

@@ -40,6 +40,7 @@ interface KitchenStoreState {
   // 2. Selection & UI State
   selectedModuleId: string | null;
   selectedCornerId: string | null;
+  selectedGapId: string | null;
   highlightedModuleIds: string[];
   activeTab: 'catalog' | 'rules' | 'generator' | 'projects';
   activeCabinetTier: 'all' | 'base' | 'upper';
@@ -67,6 +68,7 @@ interface KitchenStoreState {
   // - Selection & View
   setSelectedModuleId: (id: string | null) => void;
   setSelectedCornerId: (id: string | null) => void;
+  setSelectedGapId: (id: string | null) => void;
   toggleCornerOrientation: (cornerId: string) => void;
   setCornerOrientation: (cornerId: string, orientation: 'edge_A' | 'edge_B' | 'edge_C') => void;
   updateCornerWidth: (cornerId: string, tier: 'base' | 'upper', width: number) => void;
@@ -97,6 +99,8 @@ interface KitchenStoreState {
     edgeId: EdgeId,
     dims: { length?: number; depth?: number; height?: number }
   ) => void;
+  snapEdgeToModules: (edgeId: EdgeId, gapMm: number) => void;
+  autoFillGap: (edgeId: EdgeId, tier: 'base' | 'upper', gapMm: number) => void;
   addModuleToEdge: (
     moduleId: string,
     edgeId: EdgeId,
@@ -981,6 +985,7 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
 
     selectedModuleId: null,
     selectedCornerId: null,
+    selectedGapId: null,
     highlightedModuleIds: [],
     activeTab: 'catalog',
     activeCabinetTier: 'base',
@@ -1003,8 +1008,9 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
     canRedo: false,
 
     // UI actions
-    setSelectedModuleId: (id) => set({ selectedModuleId: id, selectedCornerId: null }),
-    setSelectedCornerId: (id) => set({ selectedCornerId: id, selectedModuleId: null }),
+    setSelectedModuleId: (id) => set({ selectedModuleId: id, selectedCornerId: null, selectedGapId: null }),
+    setSelectedCornerId: (id) => set({ selectedCornerId: id, selectedModuleId: null, selectedGapId: null }),
+    setSelectedGapId: (id) => set({ selectedGapId: id, selectedModuleId: null, selectedCornerId: null }),
     toggleCornerOrientation: (cornerId) => {
       const state = get();
       const layout = state.layout;
@@ -1454,6 +1460,172 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
       }
 
       set(pushHistory(state, updated));
+    },
+
+    snapEdgeToModules: (edgeId, gapMm) => {
+      const state = get();
+      if (!gapMm || gapMm <= 0) return;
+      const updated = { ...state.layout };
+
+      if (edgeId === 'edge_A') {
+        const curLen = updated.edgeA.length;
+        updated.edgeA = { ...updated.edgeA, length: Math.max(1200, curLen - gapMm) };
+      } else if (edgeId === 'edge_B' && updated.edgeB) {
+        const curLen = updated.edgeB.length;
+        updated.edgeB = { ...updated.edgeB, length: Math.max(1200, curLen - gapMm) };
+      } else if (edgeId === 'edge_C' && updated.edgeC) {
+        const curLen = updated.edgeC.length;
+        updated.edgeC = { ...updated.edgeC, length: Math.max(1200, curLen - gapMm) };
+      }
+
+      set(pushHistory(state, { ...updated, updatedAt: new Date().toISOString() }));
+    },
+
+    autoFillGap: (edgeId, tier, gapMm) => {
+      const state = get();
+      if (!gapMm || gapMm <= 0) return;
+
+      if (tier === 'base') {
+        // 1. Nếu trên edgeId đã có T01 -> Tăng kích thước T01 thêm gapMm
+        const t01Module = state.layout.placedModules.find(
+          (m) => m.edgeId === edgeId && m.code === 'T01'
+        );
+
+        if (t01Module) {
+          const newWidth = t01Module.width + gapMm;
+          let curOffset = 0;
+          const updatedModules = state.layout.placedModules.map((m) => {
+            if (m.edgeId === edgeId) {
+              const w = m.instanceId === t01Module.instanceId ? newWidth : m.width;
+              const res = { ...m, width: w, offset: curOffset };
+              curOffset += w;
+              return res;
+            }
+            return m;
+          });
+          const updatedLayout: KitchenLayout = {
+            ...state.layout,
+            placedModules: updatedModules,
+            updatedAt: new Date().toISOString(),
+          };
+          set(pushHistory(state, updatedLayout));
+          return;
+        }
+
+        // 2. Nếu gapMm >= 250 -> Thêm khoang tủ chứa đồ T01 vào cạnh này
+        const t01Mod = state.catalog.find((m) => m.code === 'T01');
+        if (t01Mod && gapMm >= 250) {
+          const edgeModules = state.layout.placedModules.filter((m) => m.edgeId === edgeId);
+          let maxOffset = 0;
+          edgeModules.forEach((m) => {
+            if (m.offset + m.width > maxOffset) maxOffset = m.offset + m.width;
+          });
+          const newInstance: PlacedModuleInstance = {
+            instanceId: `placed-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            moduleId: t01Mod.id,
+            variantId: t01Mod.variants[0]?.id || 'var-t01',
+            code: t01Mod.code,
+            name: t01Mod.name,
+            category: t01Mod.category,
+            width: gapMm,
+            depth: t01Mod.variants[0]?.depth || 600,
+            height: t01Mod.variants[0]?.height || 850,
+            color: t01Mod.color || '#0284c7',
+            edgeId,
+            offset: maxOffset,
+            positionIndex: edgeModules.length,
+            tier: 'base',
+          };
+          const updatedLayout: KitchenLayout = {
+            ...state.layout,
+            placedModules: [...state.layout.placedModules, newInstance],
+            updatedAt: new Date().toISOString(),
+          };
+          set(pushHistory(state, updatedLayout));
+          return;
+        }
+
+        // 3. Nếu gapMm < 250 -> Dãn khoang cuối cùng của cạnh hoặc co tường
+        const edgeModules = state.layout.placedModules.filter((m) => m.edgeId === edgeId);
+        if (edgeModules.length > 0) {
+          const lastMod = edgeModules[edgeModules.length - 1];
+          const newWidth = lastMod.width + gapMm;
+          const updatedModules = state.layout.placedModules.map((m) =>
+            m.instanceId === lastMod.instanceId
+              ? { ...m, width: newWidth }
+              : m
+          );
+          set(
+            pushHistory(state, {
+              ...state.layout,
+              placedModules: updatedModules,
+              updatedAt: new Date().toISOString(),
+            })
+          );
+          return;
+        }
+
+        // Fallback: co tường vừa khít
+        state.snapEdgeToModules(edgeId, gapMm);
+      } else {
+        // Tủ trên (upper)
+        const ut01Module = (state.layout.placedUpperModules || []).find(
+          (m) => m.edgeId === edgeId && m.code === 'UT01'
+        );
+
+        if (ut01Module) {
+          const newWidth = ut01Module.width + gapMm;
+          const updatedModules = (state.layout.placedUpperModules || []).map((m) => {
+            if (m.instanceId === ut01Module.instanceId) {
+              return { ...m, width: newWidth };
+            }
+            return m;
+          });
+          const updatedLayout: KitchenLayout = {
+            ...state.layout,
+            placedUpperModules: updatedModules,
+            updatedAt: new Date().toISOString(),
+          };
+          set(pushHistory(state, updatedLayout));
+          return;
+        }
+
+        // Thêm khoang tủ đồ trên UT01 nếu gapMm >= 250
+        const ut01Mod = state.catalog.find((m) => m.code === 'UT01');
+        if (ut01Mod && gapMm >= 250) {
+          const edgeModules = (state.layout.placedUpperModules || []).filter((m) => m.edgeId === edgeId);
+          let maxOffset = 0;
+          edgeModules.forEach((m) => {
+            if (m.offset + m.width > maxOffset) maxOffset = m.offset + m.width;
+          });
+          const newInstance: PlacedModuleInstance = {
+            instanceId: `placed-upper-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            moduleId: ut01Mod.id,
+            variantId: ut01Mod.variants[0]?.id || 'var-ut01',
+            code: ut01Mod.code,
+            name: ut01Mod.name,
+            category: ut01Mod.category,
+            width: gapMm,
+            depth: ut01Mod.variants[0]?.depth || 350,
+            height: ut01Mod.variants[0]?.height || 750,
+            color: ut01Mod.color || '#f59e0b',
+            edgeId,
+            offset: maxOffset,
+            positionIndex: edgeModules.length,
+            tier: 'upper',
+          };
+          const updatedLayout: KitchenLayout = {
+            ...state.layout,
+            placedUpperModules: [...(state.layout.placedUpperModules || []), newInstance],
+            updatedAt: new Date().toISOString(),
+          };
+          set(pushHistory(state, updatedLayout));
+          return;
+        }
+
+        // Co tường
+        state.snapEdgeToModules(edgeId, gapMm);
+      }
     },
 
     // Module Placement & Reordering

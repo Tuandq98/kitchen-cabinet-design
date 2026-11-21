@@ -28,6 +28,7 @@ export const KitchenCanvas2D: React.FC = () => {
     catalog,
     selectedModuleId,
     selectedCornerId,
+    selectedGapId,
     highlightedModuleIds,
     zoom,
     pan,
@@ -43,6 +44,7 @@ export const KitchenCanvas2D: React.FC = () => {
     resetToSetupWizard,
     setSelectedModuleId,
     setSelectedCornerId,
+    setSelectedGapId,
     toggleCornerOrientation,
     setZoom,
     setPan,
@@ -52,6 +54,8 @@ export const KitchenCanvas2D: React.FC = () => {
     removePlacedModule,
     moveModule,
     addModuleToEdge,
+    autoFillGap,
+    snapEdgeToModules,
   } = useKitchenStore();
 
   const [isUpperModalOpen, setIsUpperModalOpen] = useState(false);
@@ -527,6 +531,52 @@ export const KitchenCanvas2D: React.FC = () => {
           >
             <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8" />
           </marker>
+
+          {/* Họa tiết sọc chéo kiến trúc (Architectural Diagonal Hatch Pattern) cho khoảng trống Tủ Dưới */}
+          <pattern
+            id="gap-hatch-base"
+            width="14"
+            height="14"
+            patternTransform="rotate(45 0 0)"
+            patternUnits="userSpaceOnUse"
+          >
+            <line
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="14"
+              stroke="#06b6d4"
+              strokeWidth="1.8"
+              strokeOpacity="0.45"
+            />
+          </pattern>
+
+          {/* Họa tiết sọc chéo kiến trúc cho khoảng trống Tủ Trên */}
+          <pattern
+            id="gap-hatch-upper"
+            width="14"
+            height="14"
+            patternTransform="rotate(45 0 0)"
+            patternUnits="userSpaceOnUse"
+          >
+            <line
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="14"
+              stroke="#f59e0b"
+              strokeWidth="1.8"
+              strokeOpacity="0.45"
+            />
+          </pattern>
+
+          {/* Glow filter cho khoảng trống khi hover / select */}
+          <filter id="gap-glow-base" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#06b6d4" floodOpacity="0.8" />
+          </filter>
+          <filter id="gap-glow-upper" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#f59e0b" floodOpacity="0.8" />
+          </filter>
         </defs>
 
         {/* Cụm chứa nội dung có zoom & pan */}
@@ -1082,150 +1132,148 @@ export const KitchenCanvas2D: React.FC = () => {
           {(activeCabinetTier === 'all' || activeCabinetTier === 'upper') &&
             layout2D.upperGaps &&
             layout2D.upperGaps.map((gap) => {
-              const isLarge = gap.gapMm >= 240;
-              const isMedium = gap.gapMm >= 120 && gap.gapMm < 240;
-              const isSmall = gap.gapMm >= 60 && gap.gapMm < 120;
+              const isSelected = selectedGapId === gap.id;
+              const isNarrow = gap.gapMm < 80;
+              const isMedium = gap.gapMm >= 80 && gap.gapMm < 220;
+              const isLarge = gap.gapMm >= 220;
 
-              const badgeW = isLarge
-                ? Math.min(gap.gapMm - 20, 300)
-                : isMedium
-                ? Math.min(gap.gapMm - 16, 210)
-                : isSmall
-                ? Math.min(gap.gapMm - 8, 120)
-                : Math.max(36, gap.gapMm - 4);
-
-              const badgeH = isLarge ? 84 : isMedium ? 66 : isSmall ? 52 : 44;
+              const badgeW = isLarge ? Math.min(gap.gapMm - 20, 240) : isMedium ? Math.min(gap.gapMm - 12, 170) : 68;
+              const badgeH = isLarge ? 70 : isMedium ? 56 : 30;
 
               return (
-                <g key={gap.id} className="upper-empty-gap">
-                  {/* Khung ô khoảng trống nét đứt màu hổ phách kiến trúc */}
+                <g
+                  key={gap.id}
+                  className="upper-empty-gap group cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedGapId(gap.id);
+                  }}
+                >
+                  {/* Khung ô khoảng trống với họa tiết sọc chéo kiến trúc (Architectural Diagonal Hatch) */}
                   <rect
                     x={gap.x}
                     y={gap.y}
                     width={gap.width}
                     height={gap.height}
-                    fill="#f59e0b"
-                    fillOpacity="0.10"
-                    stroke="#f59e0b"
-                    strokeWidth="2.5"
-                    strokeDasharray="8 6"
-                    rx="6"
+                    fill="url(#gap-hatch-upper)"
+                    fillOpacity={isSelected ? '0.35' : '0.18'}
+                    stroke={isSelected ? '#fbbf24' : '#f59e0b'}
+                    strokeWidth={isSelected ? '3.5' : '2'}
+                    strokeDasharray="6 4"
+                    rx="4"
+                    filter={isSelected ? 'url(#gap-glow-upper)' : undefined}
+                    className="transition-all duration-200 group-hover:stroke-amber-300 group-hover:fill-opacity-30"
                   />
 
-                  {/* Vạch chéo kỹ thuật thể hiện khoảng không chờ */}
-                  <line
-                    x1={gap.x}
-                    y1={gap.y}
-                    x2={gap.x + gap.width}
-                    y2={gap.y + gap.height}
-                    stroke="#f59e0b"
-                    strokeOpacity="0.25"
-                    strokeWidth="1.5"
-                    strokeDasharray="6 6"
-                  />
-                  <line
-                    x1={gap.x + gap.width}
-                    y1={gap.y}
-                    x2={gap.x}
-                    y2={gap.y + gap.height}
-                    stroke="#f59e0b"
-                    strokeOpacity="0.25"
-                    strokeWidth="1.5"
-                    strokeDasharray="6 6"
-                  />
+                  {/* Viền góc định vị (CAD Corner Tick Marks) tạo phong cách bản vẽ kỹ thuật cao cấp */}
+                  <line x1={gap.x} y1={gap.y + 10} x2={gap.x} y2={gap.y} stroke="#fbbf24" strokeWidth="2.5" />
+                  <line x1={gap.x} y1={gap.y} x2={gap.x + 10} y2={gap.y} stroke="#fbbf24" strokeWidth="2.5" />
+                  <line x1={gap.x + gap.width - 10} y1={gap.y} x2={gap.x + gap.width} y2={gap.y} stroke="#fbbf24" strokeWidth="2.5" />
+                  <line x1={gap.x + gap.width} y1={gap.y} x2={gap.x + gap.width} y2={gap.y + 10} stroke="#fbbf24" strokeWidth="2.5" />
 
-                  {/* Badge hiển thị độ rộng khoảng trống TO RÕ CHUẨN CAD */}
+                  {/* Badge hiển thị độ rộng khoảng trống & tương tác */}
                   <g
                     transform={`translate(${gap.centerX}, ${gap.centerY}) rotate(${gap.rotation || 0})`}
-                    className="pointer-events-none"
+                    className="select-none"
                   >
-                    {/* Hộp nền tương phản cao */}
-                    <rect
-                      x={-badgeW / 2}
-                      y={-badgeH / 2}
-                      width={badgeW}
-                      height={badgeH}
-                      rx="14"
-                      fill="#090d16"
-                      fillOpacity="0.96"
-                      stroke="#f59e0b"
-                      strokeWidth="3"
-                    />
-
-                    {isLarge ? (
-                      <>
+                    {isNarrow ? (
+                      /* Badge nhỏ gọn cho khoảng trống hẹp (<80mm) - Dạng thẻ tag chỉ thị không che đè khoang */
+                      <g>
+                        <rect
+                          x={-badgeW / 2}
+                          y={-badgeH / 2}
+                          width={badgeW}
+                          height={badgeH}
+                          rx="8"
+                          fill="#090d16"
+                          fillOpacity="0.96"
+                          stroke={isSelected ? '#fbbf24' : '#f59e0b'}
+                          strokeWidth="2"
+                        />
                         <text
                           x="0"
-                          y="-10"
+                          y="5"
                           textAnchor="middle"
                           fill="#fbbf24"
-                          fontSize="18"
-                          fontWeight="800"
-                          letterSpacing="1px"
-                        >
-                          TRỐNG TỦ TRÊN
-                        </text>
-                        <text
-                          x="0"
-                          y="26"
-                          textAnchor="middle"
-                          fill="#ffffff"
-                          fontSize="38"
+                          fontSize="13"
                           fontWeight="900"
                           fontFamily="monospace"
                         >
-                          {gap.gapMm} mm
+                          {gap.gapMm}
                         </text>
-                      </>
-                    ) : isMedium ? (
-                      <>
+                      </g>
+                    ) : (
+                      /* Badge đầy đủ cho khoảng trống vừa & lớn (>=80mm) */
+                      <g>
+                        <rect
+                          x={-badgeW / 2}
+                          y={-badgeH / 2}
+                          width={badgeW}
+                          height={badgeH}
+                          rx="10"
+                          fill="#090d16"
+                          fillOpacity="0.96"
+                          stroke={isSelected ? '#fbbf24' : '#f59e0b'}
+                          strokeWidth={isSelected ? '2.5' : '1.8'}
+                          className="transition-colors group-hover:border-amber-300"
+                        />
                         <text
                           x="0"
-                          y="-8"
+                          y={isLarge ? '-10' : '-8'}
                           textAnchor="middle"
                           fill="#fbbf24"
-                          fontSize="15"
+                          fontSize={isLarge ? '13' : '11'}
                           fontWeight="800"
                           letterSpacing="0.5px"
                         >
-                          TRỐNG
+                          📐 TRỐNG TỦ TRÊN
                         </text>
                         <text
                           x="0"
-                          y="20"
+                          y={isLarge ? '20' : '16'}
                           textAnchor="middle"
                           fill="#ffffff"
-                          fontSize="30"
+                          fontSize={isLarge ? '28' : '22'}
                           fontWeight="900"
                           fontFamily="monospace"
                         >
                           {gap.gapMm} mm
                         </text>
-                      </>
-                    ) : isSmall ? (
-                      <text
-                        x="0"
-                        y="8"
-                        textAnchor="middle"
-                        fill="#fbbf24"
-                        fontSize="26"
-                        fontWeight="900"
-                        fontFamily="monospace"
+                      </g>
+                    )}
+
+                    {/* Nút bấm nhanh 1-click Auto-Fit nổi lên khi được click hoặc hover (khi khoảng trống >= 60mm) */}
+                    {(isSelected || gap.gapMm >= 100) && (
+                      <g
+                        transform={`translate(0, ${isNarrow ? 26 : badgeH / 2 + 18})`}
+                        className="cursor-pointer transition-transform hover:scale-105 active:scale-95"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          autoFillGap(gap.edgeId, 'upper', gap.gapMm);
+                        }}
                       >
-                        {gap.gapMm} mm
-                      </text>
-                    ) : (
-                      <text
-                        x="0"
-                        y="7"
-                        textAnchor="middle"
-                        fill="#fbbf24"
-                        fontSize="20"
-                        fontWeight="900"
-                        fontFamily="monospace"
-                      >
-                        {gap.gapMm}
-                      </text>
+                        <rect
+                          x="-62"
+                          y="-13"
+                          width="124"
+                          height="26"
+                          rx="6"
+                          fill="#b45309"
+                          stroke="#fde68a"
+                          strokeWidth="1.5"
+                          filter="url(#gap-glow-upper)"
+                        />
+                        <text
+                          x="0"
+                          y="4"
+                          textAnchor="middle"
+                          fill="#ffffff"
+                          fontSize="11"
+                          fontWeight="bold"
+                        >
+                          ⚡ Lấp đầy (Auto-Fit)
+                        </text>
+                      </g>
                     )}
                   </g>
                 </g>
@@ -1236,150 +1284,148 @@ export const KitchenCanvas2D: React.FC = () => {
           {(activeCabinetTier === 'all' || activeCabinetTier === 'base') &&
             layout2D.baseGaps &&
             layout2D.baseGaps.map((gap) => {
-              const isLarge = gap.gapMm >= 240;
-              const isMedium = gap.gapMm >= 120 && gap.gapMm < 240;
-              const isSmall = gap.gapMm >= 60 && gap.gapMm < 120;
+              const isSelected = selectedGapId === gap.id;
+              const isNarrow = gap.gapMm < 80;
+              const isMedium = gap.gapMm >= 80 && gap.gapMm < 220;
+              const isLarge = gap.gapMm >= 220;
 
-              const badgeW = isLarge
-                ? Math.min(gap.gapMm - 20, 300)
-                : isMedium
-                ? Math.min(gap.gapMm - 16, 210)
-                : isSmall
-                ? Math.min(gap.gapMm - 8, 120)
-                : Math.max(36, gap.gapMm - 4);
-
-              const badgeH = isLarge ? 84 : isMedium ? 66 : isSmall ? 52 : 44;
+              const badgeW = isLarge ? Math.min(gap.gapMm - 20, 240) : isMedium ? Math.min(gap.gapMm - 12, 170) : 68;
+              const badgeH = isLarge ? 70 : isMedium ? 56 : 30;
 
               return (
-                <g key={gap.id} className="base-empty-gap">
-                  {/* Khung ô khoảng trống nét đứt màu xanh dương kiến trúc */}
+                <g
+                  key={gap.id}
+                  className="base-empty-gap group cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedGapId(gap.id);
+                  }}
+                >
+                  {/* Khung ô khoảng trống với họa tiết sọc chéo kiến trúc Cyan (Architectural Diagonal Hatch) */}
                   <rect
                     x={gap.x}
                     y={gap.y}
                     width={gap.width}
                     height={gap.height}
-                    fill="#0284c7"
-                    fillOpacity="0.10"
-                    stroke="#0284c7"
-                    strokeWidth="2.5"
-                    strokeDasharray="8 6"
-                    rx="6"
+                    fill="url(#gap-hatch-base)"
+                    fillOpacity={isSelected ? '0.35' : '0.18'}
+                    stroke={isSelected ? '#38bdf8' : '#06b6d4'}
+                    strokeWidth={isSelected ? '3.5' : '2'}
+                    strokeDasharray="6 4"
+                    rx="4"
+                    filter={isSelected ? 'url(#gap-glow-base)' : undefined}
+                    className="transition-all duration-200 group-hover:stroke-cyan-300 group-hover:fill-opacity-30"
                   />
 
-                  {/* Vạch chéo kỹ thuật thể hiện khoảng không chờ */}
-                  <line
-                    x1={gap.x}
-                    y1={gap.y}
-                    x2={gap.x + gap.width}
-                    y2={gap.y + gap.height}
-                    stroke="#0284c7"
-                    strokeOpacity="0.25"
-                    strokeWidth="1.5"
-                    strokeDasharray="6 6"
-                  />
-                  <line
-                    x1={gap.x + gap.width}
-                    y1={gap.y}
-                    x2={gap.x}
-                    y2={gap.y + gap.height}
-                    stroke="#0284c7"
-                    strokeOpacity="0.25"
-                    strokeWidth="1.5"
-                    strokeDasharray="6 6"
-                  />
+                  {/* Viền góc định vị (CAD Corner Tick Marks) tạo phong cách bản vẽ kỹ thuật cao cấp */}
+                  <line x1={gap.x} y1={gap.y + 10} x2={gap.x} y2={gap.y} stroke="#06b6d4" strokeWidth="2.5" />
+                  <line x1={gap.x} y1={gap.y} x2={gap.x + 10} y2={gap.y} stroke="#06b6d4" strokeWidth="2.5" />
+                  <line x1={gap.x + gap.width - 10} y1={gap.y} x2={gap.x + gap.width} y2={gap.y} stroke="#06b6d4" strokeWidth="2.5" />
+                  <line x1={gap.x + gap.width} y1={gap.y} x2={gap.x + gap.width} y2={gap.y + 10} stroke="#06b6d4" strokeWidth="2.5" />
 
-                  {/* Badge hiển thị độ rộng khoảng trống TO RÕ CHUẨN CAD */}
+                  {/* Badge hiển thị độ rộng khoảng trống & tương tác */}
                   <g
                     transform={`translate(${gap.centerX}, ${gap.centerY}) rotate(${gap.rotation || 0})`}
-                    className="pointer-events-none"
+                    className="select-none"
                   >
-                    {/* Hộp nền tương phản cao */}
-                    <rect
-                      x={-badgeW / 2}
-                      y={-badgeH / 2}
-                      width={badgeW}
-                      height={badgeH}
-                      rx="14"
-                      fill="#090d16"
-                      fillOpacity="0.96"
-                      stroke="#0284c7"
-                      strokeWidth="3"
-                    />
-
-                    {isLarge ? (
-                      <>
+                    {isNarrow ? (
+                      /* Badge nhỏ gọn cho khoảng trống hẹp (<80mm) - Không che đè khoang bên cạnh */
+                      <g>
+                        <rect
+                          x={-badgeW / 2}
+                          y={-badgeH / 2}
+                          width={badgeW}
+                          height={badgeH}
+                          rx="8"
+                          fill="#090d16"
+                          fillOpacity="0.96"
+                          stroke={isSelected ? '#38bdf8' : '#06b6d4'}
+                          strokeWidth="2"
+                        />
                         <text
                           x="0"
-                          y="-10"
+                          y="5"
                           textAnchor="middle"
                           fill="#38bdf8"
-                          fontSize="18"
-                          fontWeight="800"
-                          letterSpacing="1px"
-                        >
-                          TRỐNG TỦ DƯỚI
-                        </text>
-                        <text
-                          x="0"
-                          y="26"
-                          textAnchor="middle"
-                          fill="#ffffff"
-                          fontSize="38"
+                          fontSize="13"
                           fontWeight="900"
                           fontFamily="monospace"
                         >
-                          {gap.gapMm} mm
+                          {gap.gapMm}
                         </text>
-                      </>
-                    ) : isMedium ? (
-                      <>
+                      </g>
+                    ) : (
+                      /* Badge đầy đủ cho khoảng trống vừa & lớn (>=80mm) */
+                      <g>
+                        <rect
+                          x={-badgeW / 2}
+                          y={-badgeH / 2}
+                          width={badgeW}
+                          height={badgeH}
+                          rx="10"
+                          fill="#090d16"
+                          fillOpacity="0.96"
+                          stroke={isSelected ? '#38bdf8' : '#06b6d4'}
+                          strokeWidth={isSelected ? '2.5' : '1.8'}
+                          className="transition-colors group-hover:border-cyan-300"
+                        />
                         <text
                           x="0"
-                          y="-8"
+                          y={isLarge ? '-10' : '-8'}
                           textAnchor="middle"
                           fill="#38bdf8"
-                          fontSize="15"
+                          fontSize={isLarge ? '13' : '11'}
                           fontWeight="800"
                           letterSpacing="0.5px"
                         >
-                          TRỐNG
+                          📐 TRỐNG TỦ DƯỚI
                         </text>
                         <text
                           x="0"
-                          y="20"
+                          y={isLarge ? '20' : '16'}
                           textAnchor="middle"
                           fill="#ffffff"
-                          fontSize="30"
+                          fontSize={isLarge ? '28' : '22'}
                           fontWeight="900"
                           fontFamily="monospace"
                         >
                           {gap.gapMm} mm
                         </text>
-                      </>
-                    ) : isSmall ? (
-                      <text
-                        x="0"
-                        y="8"
-                        textAnchor="middle"
-                        fill="#38bdf8"
-                        fontSize="26"
-                        fontWeight="900"
-                        fontFamily="monospace"
+                      </g>
+                    )}
+
+                    {/* Nút bấm nhanh 1-click Auto-Fit nổi lên khi được click hoặc hover (khi khoảng trống >= 60mm) */}
+                    {(isSelected || gap.gapMm >= 100) && (
+                      <g
+                        transform={`translate(0, ${isNarrow ? 26 : badgeH / 2 + 18})`}
+                        className="cursor-pointer transition-transform hover:scale-105 active:scale-95"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          autoFillGap(gap.edgeId, 'base', gap.gapMm);
+                        }}
                       >
-                        {gap.gapMm} mm
-                      </text>
-                    ) : (
-                      <text
-                        x="0"
-                        y="7"
-                        textAnchor="middle"
-                        fill="#38bdf8"
-                        fontSize="20"
-                        fontWeight="900"
-                        fontFamily="monospace"
-                      >
-                        {gap.gapMm}
-                      </text>
+                        <rect
+                          x="-62"
+                          y="-13"
+                          width="124"
+                          height="26"
+                          rx="6"
+                          fill="#0284c7"
+                          stroke="#7dd3fc"
+                          strokeWidth="1.5"
+                          filter="url(#gap-glow-base)"
+                        />
+                        <text
+                          x="0"
+                          y="4"
+                          textAnchor="middle"
+                          fill="#ffffff"
+                          fontSize="11"
+                          fontWeight="bold"
+                        >
+                          ⚡ Lấp đầy (Auto-Fit)
+                        </text>
+                      </g>
                     )}
                   </g>
                 </g>
