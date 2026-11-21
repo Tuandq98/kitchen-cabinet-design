@@ -859,256 +859,310 @@ export const KitchenCanvas2D: React.FC = () => {
           {/* 5.1 CÁC KHOẢNG TRỐNG CÒN LẠI CỦA TỦ TRÊN (UPPER EMPTY GAPS) */}
           {(activeCabinetTier === 'all' || activeCabinetTier === 'upper') &&
             layout2D.upperGaps &&
-            layout2D.upperGaps.map((gap) => (
-              <g key={gap.id} className="upper-empty-gap">
-                {/* Khung ô khoảng trống nét đứt màu hổ phách kiến trúc */}
-                <rect
-                  x={gap.x}
-                  y={gap.y}
-                  width={gap.width}
-                  height={gap.height}
-                  fill="#f59e0b"
-                  fillOpacity="0.08"
-                  stroke="#f59e0b"
-                  strokeWidth="1.8"
-                  strokeDasharray="6 4"
-                  rx="4"
-                />
+            layout2D.upperGaps.map((gap) => {
+              const isLarge = gap.gapMm >= 240;
+              const isMedium = gap.gapMm >= 120 && gap.gapMm < 240;
+              const isSmall = gap.gapMm >= 60 && gap.gapMm < 120;
 
-                {/* Vạch chéo kỹ thuật thể hiện khoảng không chờ */}
-                <line
-                  x1={gap.x}
-                  y1={gap.y}
-                  x2={gap.x + gap.width}
-                  y2={gap.y + gap.height}
-                  stroke="#f59e0b"
-                  strokeOpacity="0.2"
-                  strokeWidth="1"
-                  strokeDasharray="4 4"
-                />
-                <line
-                  x1={gap.x + gap.width}
-                  y1={gap.y}
-                  x2={gap.x}
-                  y2={gap.y + gap.height}
-                  stroke="#f59e0b"
-                  strokeOpacity="0.2"
-                  strokeWidth="1"
-                  strokeDasharray="4 4"
-                />
+              const badgeW = isLarge
+                ? Math.min(gap.gapMm - 20, 300)
+                : isMedium
+                ? Math.min(gap.gapMm - 16, 210)
+                : isSmall
+                ? Math.min(gap.gapMm - 8, 120)
+                : Math.max(36, gap.gapMm - 4);
 
-                {/* Badge hiển thị độ rộng khoảng trống chuẩn xác mm */}
-                <g
-                  transform={`translate(${gap.centerX}, ${gap.centerY}) rotate(${gap.rotation || 0})`}
-                  className="pointer-events-none"
-                >
-                  {gap.gapMm >= 180 ? (
-                    <>
-                      <rect
-                        x="-72"
-                        y="-16"
-                        width="144"
-                        height="32"
-                        rx="8"
-                        fill="#18181b"
-                        fillOpacity="0.96"
-                        stroke="#f59e0b"
-                        strokeWidth="1.5"
-                      />
+              const badgeH = isLarge ? 84 : isMedium ? 66 : isSmall ? 52 : 44;
+
+              return (
+                <g key={gap.id} className="upper-empty-gap">
+                  {/* Khung ô khoảng trống nét đứt màu hổ phách kiến trúc */}
+                  <rect
+                    x={gap.x}
+                    y={gap.y}
+                    width={gap.width}
+                    height={gap.height}
+                    fill="#f59e0b"
+                    fillOpacity="0.10"
+                    stroke="#f59e0b"
+                    strokeWidth="2.5"
+                    strokeDasharray="8 6"
+                    rx="6"
+                  />
+
+                  {/* Vạch chéo kỹ thuật thể hiện khoảng không chờ */}
+                  <line
+                    x1={gap.x}
+                    y1={gap.y}
+                    x2={gap.x + gap.width}
+                    y2={gap.y + gap.height}
+                    stroke="#f59e0b"
+                    strokeOpacity="0.25"
+                    strokeWidth="1.5"
+                    strokeDasharray="6 6"
+                  />
+                  <line
+                    x1={gap.x + gap.width}
+                    y1={gap.y}
+                    x2={gap.x}
+                    y2={gap.y + gap.height}
+                    stroke="#f59e0b"
+                    strokeOpacity="0.25"
+                    strokeWidth="1.5"
+                    strokeDasharray="6 6"
+                  />
+
+                  {/* Badge hiển thị độ rộng khoảng trống TO RÕ CHUẨN CAD */}
+                  <g
+                    transform={`translate(${gap.centerX}, ${gap.centerY}) rotate(${gap.rotation || 0})`}
+                    className="pointer-events-none"
+                  >
+                    {/* Hộp nền tương phản cao */}
+                    <rect
+                      x={-badgeW / 2}
+                      y={-badgeH / 2}
+                      width={badgeW}
+                      height={badgeH}
+                      rx="14"
+                      fill="#090d16"
+                      fillOpacity="0.96"
+                      stroke="#f59e0b"
+                      strokeWidth="3"
+                    />
+
+                    {isLarge ? (
+                      <>
+                        <text
+                          x="0"
+                          y="-10"
+                          textAnchor="middle"
+                          fill="#fbbf24"
+                          fontSize="18"
+                          fontWeight="800"
+                          letterSpacing="1px"
+                        >
+                          TRỐNG TỦ TRÊN
+                        </text>
+                        <text
+                          x="0"
+                          y="26"
+                          textAnchor="middle"
+                          fill="#ffffff"
+                          fontSize="38"
+                          fontWeight="900"
+                          fontFamily="monospace"
+                        >
+                          {gap.gapMm} mm
+                        </text>
+                      </>
+                    ) : isMedium ? (
+                      <>
+                        <text
+                          x="0"
+                          y="-8"
+                          textAnchor="middle"
+                          fill="#fbbf24"
+                          fontSize="15"
+                          fontWeight="800"
+                          letterSpacing="0.5px"
+                        >
+                          TRỐNG
+                        </text>
+                        <text
+                          x="0"
+                          y="20"
+                          textAnchor="middle"
+                          fill="#ffffff"
+                          fontSize="30"
+                          fontWeight="900"
+                          fontFamily="monospace"
+                        >
+                          {gap.gapMm} mm
+                        </text>
+                      </>
+                    ) : isSmall ? (
                       <text
                         x="0"
-                        y="5"
+                        y="8"
                         textAnchor="middle"
                         fill="#fbbf24"
-                        fontSize="13"
-                        fontWeight="800"
+                        fontSize="26"
+                        fontWeight="900"
                         fontFamily="monospace"
-                        letterSpacing="0.5px"
                       >
-                        TRỐNG: {gap.gapMm} mm
+                        {gap.gapMm} mm
                       </text>
-                    </>
-                  ) : gap.gapMm >= 80 ? (
-                    <>
-                      <rect
-                        x="-48"
-                        y="-14"
-                        width="96"
-                        height="28"
-                        rx="6"
-                        fill="#18181b"
-                        fillOpacity="0.96"
-                        stroke="#f59e0b"
-                        strokeWidth="1.5"
-                      />
+                    ) : (
                       <text
                         x="0"
-                        y="4"
+                        y="7"
                         textAnchor="middle"
                         fill="#fbbf24"
-                        fontSize="12"
-                        fontWeight="800"
-                        fontFamily="monospace"
-                      >
-                        Trống {gap.gapMm}
-                      </text>
-                    </>
-                  ) : (
-                    <>
-                      <rect
-                        x="-30"
-                        y="-12"
-                        width="60"
-                        height="24"
-                        rx="5"
-                        fill="#18181b"
-                        fillOpacity="0.96"
-                        stroke="#f59e0b"
-                        strokeWidth="1.5"
-                      />
-                      <text
-                        x="0"
-                        y="4"
-                        textAnchor="middle"
-                        fill="#fbbf24"
-                        fontSize="11"
-                        fontWeight="800"
+                        fontSize="20"
+                        fontWeight="900"
                         fontFamily="monospace"
                       >
                         {gap.gapMm}
                       </text>
-                    </>
-                  )}
+                    )}
+                  </g>
                 </g>
-              </g>
-            ))}
+              );
+            })}
 
           {/* 5.2 CÁC KHOẢNG TRỐNG CÒN LẠI CỦA TỦ DƯỚI (BASE EMPTY GAPS) */}
           {(activeCabinetTier === 'all' || activeCabinetTier === 'base') &&
             layout2D.baseGaps &&
-            layout2D.baseGaps.map((gap) => (
-              <g key={gap.id} className="base-empty-gap">
-                {/* Khung ô khoảng trống nét đứt màu xanh dương kiến trúc */}
-                <rect
-                  x={gap.x}
-                  y={gap.y}
-                  width={gap.width}
-                  height={gap.height}
-                  fill="#0284c7"
-                  fillOpacity="0.08"
-                  stroke="#0284c7"
-                  strokeWidth="1.8"
-                  strokeDasharray="6 4"
-                  rx="4"
-                />
+            layout2D.baseGaps.map((gap) => {
+              const isLarge = gap.gapMm >= 240;
+              const isMedium = gap.gapMm >= 120 && gap.gapMm < 240;
+              const isSmall = gap.gapMm >= 60 && gap.gapMm < 120;
 
-                {/* Vạch chéo kỹ thuật thể hiện khoảng không chờ */}
-                <line
-                  x1={gap.x}
-                  y1={gap.y}
-                  x2={gap.x + gap.width}
-                  y2={gap.y + gap.height}
-                  stroke="#0284c7"
-                  strokeOpacity="0.2"
-                  strokeWidth="1"
-                  strokeDasharray="4 4"
-                />
-                <line
-                  x1={gap.x + gap.width}
-                  y1={gap.y}
-                  x2={gap.x}
-                  y2={gap.y + gap.height}
-                  stroke="#0284c7"
-                  strokeOpacity="0.2"
-                  strokeWidth="1"
-                  strokeDasharray="4 4"
-                />
+              const badgeW = isLarge
+                ? Math.min(gap.gapMm - 20, 300)
+                : isMedium
+                ? Math.min(gap.gapMm - 16, 210)
+                : isSmall
+                ? Math.min(gap.gapMm - 8, 120)
+                : Math.max(36, gap.gapMm - 4);
 
-                {/* Badge hiển thị độ rộng khoảng trống chuẩn xác mm */}
-                <g
-                  transform={`translate(${gap.centerX}, ${gap.centerY}) rotate(${gap.rotation || 0})`}
-                  className="pointer-events-none"
-                >
-                  {gap.gapMm >= 180 ? (
-                    <>
-                      <rect
-                        x="-72"
-                        y="-16"
-                        width="144"
-                        height="32"
-                        rx="8"
-                        fill="#18181b"
-                        fillOpacity="0.96"
-                        stroke="#0284c7"
-                        strokeWidth="1.5"
-                      />
+              const badgeH = isLarge ? 84 : isMedium ? 66 : isSmall ? 52 : 44;
+
+              return (
+                <g key={gap.id} className="base-empty-gap">
+                  {/* Khung ô khoảng trống nét đứt màu xanh dương kiến trúc */}
+                  <rect
+                    x={gap.x}
+                    y={gap.y}
+                    width={gap.width}
+                    height={gap.height}
+                    fill="#0284c7"
+                    fillOpacity="0.10"
+                    stroke="#0284c7"
+                    strokeWidth="2.5"
+                    strokeDasharray="8 6"
+                    rx="6"
+                  />
+
+                  {/* Vạch chéo kỹ thuật thể hiện khoảng không chờ */}
+                  <line
+                    x1={gap.x}
+                    y1={gap.y}
+                    x2={gap.x + gap.width}
+                    y2={gap.y + gap.height}
+                    stroke="#0284c7"
+                    strokeOpacity="0.25"
+                    strokeWidth="1.5"
+                    strokeDasharray="6 6"
+                  />
+                  <line
+                    x1={gap.x + gap.width}
+                    y1={gap.y}
+                    x2={gap.x}
+                    y2={gap.y + gap.height}
+                    stroke="#0284c7"
+                    strokeOpacity="0.25"
+                    strokeWidth="1.5"
+                    strokeDasharray="6 6"
+                  />
+
+                  {/* Badge hiển thị độ rộng khoảng trống TO RÕ CHUẨN CAD */}
+                  <g
+                    transform={`translate(${gap.centerX}, ${gap.centerY}) rotate(${gap.rotation || 0})`}
+                    className="pointer-events-none"
+                  >
+                    {/* Hộp nền tương phản cao */}
+                    <rect
+                      x={-badgeW / 2}
+                      y={-badgeH / 2}
+                      width={badgeW}
+                      height={badgeH}
+                      rx="14"
+                      fill="#090d16"
+                      fillOpacity="0.96"
+                      stroke="#0284c7"
+                      strokeWidth="3"
+                    />
+
+                    {isLarge ? (
+                      <>
+                        <text
+                          x="0"
+                          y="-10"
+                          textAnchor="middle"
+                          fill="#38bdf8"
+                          fontSize="18"
+                          fontWeight="800"
+                          letterSpacing="1px"
+                        >
+                          TRỐNG TỦ DƯỚI
+                        </text>
+                        <text
+                          x="0"
+                          y="26"
+                          textAnchor="middle"
+                          fill="#ffffff"
+                          fontSize="38"
+                          fontWeight="900"
+                          fontFamily="monospace"
+                        >
+                          {gap.gapMm} mm
+                        </text>
+                      </>
+                    ) : isMedium ? (
+                      <>
+                        <text
+                          x="0"
+                          y="-8"
+                          textAnchor="middle"
+                          fill="#38bdf8"
+                          fontSize="15"
+                          fontWeight="800"
+                          letterSpacing="0.5px"
+                        >
+                          TRỐNG
+                        </text>
+                        <text
+                          x="0"
+                          y="20"
+                          textAnchor="middle"
+                          fill="#ffffff"
+                          fontSize="30"
+                          fontWeight="900"
+                          fontFamily="monospace"
+                        >
+                          {gap.gapMm} mm
+                        </text>
+                      </>
+                    ) : isSmall ? (
                       <text
                         x="0"
-                        y="5"
+                        y="8"
                         textAnchor="middle"
                         fill="#38bdf8"
-                        fontSize="13"
-                        fontWeight="800"
+                        fontSize="26"
+                        fontWeight="900"
                         fontFamily="monospace"
-                        letterSpacing="0.5px"
                       >
-                        TRỐNG: {gap.gapMm} mm
+                        {gap.gapMm} mm
                       </text>
-                    </>
-                  ) : gap.gapMm >= 80 ? (
-                    <>
-                      <rect
-                        x="-48"
-                        y="-14"
-                        width="96"
-                        height="28"
-                        rx="6"
-                        fill="#18181b"
-                        fillOpacity="0.96"
-                        stroke="#0284c7"
-                        strokeWidth="1.5"
-                      />
+                    ) : (
                       <text
                         x="0"
-                        y="4"
+                        y="7"
                         textAnchor="middle"
                         fill="#38bdf8"
-                        fontSize="12"
-                        fontWeight="800"
-                        fontFamily="monospace"
-                      >
-                        Trống {gap.gapMm}
-                      </text>
-                    </>
-                  ) : (
-                    <>
-                      <rect
-                        x="-30"
-                        y="-12"
-                        width="60"
-                        height="24"
-                        rx="5"
-                        fill="#18181b"
-                        fillOpacity="0.96"
-                        stroke="#0284c7"
-                        strokeWidth="1.5"
-                      />
-                      <text
-                        x="0"
-                        y="4"
-                        textAnchor="middle"
-                        fill="#38bdf8"
-                        fontSize="11"
-                        fontWeight="800"
+                        fontSize="20"
+                        fontWeight="900"
                         fontFamily="monospace"
                       >
                         {gap.gapMm}
                       </text>
-                    </>
-                  )}
+                    )}
+                  </g>
                 </g>
-              </g>
-            ))}
+              );
+            })}
 
           {/* 6. ĐƯỜNG GIÓNG CĂN TIM (ALIGNMENT GUIDE LINES) GIỮA TỦ DƯỚI & TỦ TRÊN */}
           {activeCabinetTier === 'all' && (() => {

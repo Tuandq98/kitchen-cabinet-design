@@ -679,25 +679,25 @@ export const RightSidebar: React.FC = () => {
 
       {/* 1.4 BẢNG THỐNG KÊ KHOẢNG TRỐNG TỦ DƯỚI (BASE EMPTY GAPS OVERVIEW) */}
       {layout.placedModules.length > 0 && (
-        <div className="p-3 border-b border-slate-800 bg-slate-950/20 space-y-2">
+        <div className="p-3 border-b border-slate-800 bg-slate-950/40 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
-              <Ruler className="w-3.5 h-3.5 text-sky-400" />
-              <span>Khoảng trống Tủ Dưới còn lại</span>
+              <Ruler className="w-4 h-4 text-sky-400" />
+              <span>Khoảng trống Tủ Dưới</span>
             </span>
-            <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
+            <span className="text-xs font-mono font-black px-2.5 py-1 rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm">
               Tổng: {totalBaseGapsMm} mm
             </span>
           </div>
 
           {allBaseGaps.length > 0 ? (
-            <div className="space-y-1.5 max-h-36 overflow-y-auto">
+            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
               {allBaseGaps.map((gap, idx) => (
                 <div
                   key={gap.id}
-                  className="flex items-center justify-between py-1 px-2 rounded-lg bg-slate-900/80 border border-slate-800 text-[11px]"
+                  className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs shadow-sm"
                 >
-                  <span className="text-slate-400">
+                  <span className="text-slate-300 font-medium">
                     {gap.edgeId === 'edge_A'
                       ? 'Cạnh A'
                       : gap.edgeId === 'edge_B'
@@ -705,15 +705,15 @@ export const RightSidebar: React.FC = () => {
                       : 'Cạnh C'}{' '}
                     • Khoảng #{idx + 1}
                   </span>
-                  <span className="font-mono font-bold text-sky-300">
+                  <span className="font-mono font-black text-sm text-sky-300 bg-slate-950 px-2 py-0.5 rounded border border-sky-500/30">
                     {gap.gapMm} mm
                   </span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-[11px] text-emerald-400 py-1 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            <div className="text-xs text-emerald-400 py-1 flex items-center gap-1.5 font-medium">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
               <span>Hệ tủ dưới đã được lấp đầy hoàn hảo (0 mm trống).</span>
             </div>
           )}
@@ -722,25 +722,25 @@ export const RightSidebar: React.FC = () => {
 
       {/* 1.5 BẢNG THỐNG KÊ KHOẢNG TRỐNG TỦ TRÊN (EMPTY GAPS OVERVIEW) */}
       {(layout.placedUpperModules || []).length > 0 && (
-        <div className="p-3 border-b border-slate-800 bg-slate-950/20 space-y-2">
+        <div className="p-3 border-b border-slate-800 bg-slate-950/40 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-              <Ruler className="w-3.5 h-3.5 text-amber-400" />
-              <span>Khoảng trống Tủ Trên còn lại</span>
+              <Ruler className="w-4 h-4 text-amber-400" />
+              <span>Khoảng trống Tủ Trên</span>
             </span>
-            <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            <span className="text-xs font-mono font-black px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm">
               Tổng: {totalUpperGapsMm} mm
             </span>
           </div>
 
           {allUpperGaps.length > 0 ? (
-            <div className="space-y-1.5 max-h-36 overflow-y-auto">
+            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
               {allUpperGaps.map((gap, idx) => (
                 <div
                   key={gap.id}
-                  className="flex items-center justify-between py-1 px-2 rounded-lg bg-slate-900/80 border border-slate-800 text-[11px]"
+                  className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs shadow-sm"
                 >
-                  <span className="text-slate-400">
+                  <span className="text-slate-300 font-medium">
                     {gap.edgeId === 'edge_A'
                       ? 'Cạnh A'
                       : gap.edgeId === 'edge_B'
@@ -748,15 +748,15 @@ export const RightSidebar: React.FC = () => {
                       : 'Cạnh C'}{' '}
                     • Khoảng #{idx + 1}
                   </span>
-                  <span className="font-mono font-bold text-amber-300">
+                  <span className="font-mono font-black text-sm text-amber-300 bg-slate-950 px-2 py-0.5 rounded border border-amber-500/30">
                     {gap.gapMm} mm
                   </span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-[11px] text-emerald-400 py-1 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            <div className="text-xs text-emerald-400 py-1 flex items-center gap-1.5 font-medium">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
               <span>Hệ tủ trên đã được lấp đầy hoàn hảo (0 mm trống).</span>
             </div>
           )}
