@@ -281,6 +281,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   onDragStart={(e) => {
                     if (isCornerDisabledInShapeI) return;
                     e.dataTransfer.setData('application/kitchen-module', mod.id);
+                    e.dataTransfer.setData('application/kitchen-tier', mod.tier || 'base');
                   }}
                   className={`bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 transition group relative overflow-hidden pl-3.5 ${
                     isCornerDisabledInShapeI
