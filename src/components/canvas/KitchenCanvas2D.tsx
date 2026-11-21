@@ -1,8 +1,287 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useKitchenStore } from '../../store/useKitchenStore';
-import { calculateLayout2D } from '../../utils/geometry';
+import { calculateLayout2D, Module2DBox, Layout2DBounds } from '../../utils/geometry';
+import { KitchenLayout } from '../../types';
 import { ModuleSvgItem } from './ModuleSvgItem';
 import { UpperCabinetModal } from '../modals/UpperCabinetModal';
+
+interface DragCandidate {
+  box: Module2DBox;
+  tier: 'base' | 'upper';
+  startX: number;
+  startY: number;
+}
+
+interface ActiveDragState {
+  box: Module2DBox;
+  tier: 'base' | 'upper';
+  clientX: number;
+  clientY: number;
+  modelX: number;
+  modelY: number;
+  targetEdge: 'edge_A' | 'edge_B' | 'edge_C';
+  targetIndex: number;
+  indicator: {
+    isVertical: boolean;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    badgeX: number;
+    badgeY: number;
+    label: string;
+  };
+}
+
+interface DropTargetResult {
+  edgeId: 'edge_A' | 'edge_B' | 'edge_C';
+  targetIndex: number;
+  indicator: {
+    isVertical: boolean;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    badgeX: number;
+    badgeY: number;
+    label: string;
+  };
+}
+
+function calculateDropTarget(params: {
+  modelX: number;
+  modelY: number;
+  tier: 'base' | 'upper';
+  draggedBox: Module2DBox;
+  layout: KitchenLayout;
+  layout2D: Layout2DBounds;
+  activeCabinetTier: 'all' | 'base' | 'upper';
+}): DropTargetResult {
+  const { modelX, modelY, tier, draggedBox, layout, layout2D, activeCabinetTier } = params;
+  const is2Row = activeCabinetTier === 'all';
+  const shape = layout.shape;
+  const upperDepth = layout.upperDepth || 350;
+  const GAP = 150;
+  const baseRowY = is2Row ? upperDepth + GAP : 0;
+  const lengthA = layout.edgeA.length;
+  const depthA = layout.edgeA.depth || 600;
+  const depthB = layout.edgeB?.depth || 600;
+  const depthC = layout.edgeC?.depth || 600;
+
+  // 1. Xác định Cạnh mục tiêu (targetEdge) theo tọa độ không gian 2D
+  let targetEdge: 'edge_A' | 'edge_B' | 'edge_C' = 'edge_A';
+
+  if (shape === 'L') {
+    if (tier === 'base') {
+      if (modelX < depthB + 300 && modelY > baseRowY + 150) {
+        targetEdge = 'edge_B';
+      } else {
+        targetEdge = 'edge_A';
+      }
+    } else {
+      if (is2Row) {
+        if (modelX < 80) {
+          targetEdge = 'edge_B';
+        } else {
+          targetEdge = 'edge_A';
+        }
+      } else {
+        if (modelX < upperDepth + 250 && modelY > 150) {
+          targetEdge = 'edge_B';
+        } else {
+          targetEdge = 'edge_A';
+        }
+      }
+    }
+  } else if (shape === 'U') {
+    if (tier === 'base') {
+      if (modelX < depthB + 300 && modelY > baseRowY + 150) {
+        targetEdge = 'edge_B';
+      } else if (modelX > lengthA - depthC - 300 && modelY > baseRowY + 150) {
+        targetEdge = 'edge_C';
+      } else if (modelY > baseRowY + depthA + 100) {
+        targetEdge = modelX < lengthA / 2 ? 'edge_B' : 'edge_C';
+      } else {
+        if (modelX < depthB) targetEdge = 'edge_B';
+        else if (modelX > lengthA - depthC) targetEdge = 'edge_C';
+        else targetEdge = 'edge_A';
+      }
+    } else {
+      if (is2Row) {
+        if (modelX < 80) {
+          targetEdge = 'edge_B';
+        } else if (modelX > lengthA - 80) {
+          targetEdge = 'edge_C';
+        } else {
+          targetEdge = 'edge_A';
+        }
+      } else {
+        if (modelX < upperDepth + 250 && modelY > 150) {
+          targetEdge = 'edge_B';
+        } else if (modelX > lengthA - upperDepth - 250 && modelY > 150) {
+          targetEdge = 'edge_C';
+        } else {
+          targetEdge = 'edge_A';
+        }
+      }
+    }
+  } else {
+    targetEdge = 'edge_A';
+  }
+
+  // 2. Lấy danh sách các khoang trên cạnh mục tiêu (trừ khoang đang kéo)
+  const candidateBoxes = tier === 'upper' ? layout2D.upperModules : layout2D.modules;
+  const onEdge = candidateBoxes.filter(
+    (b) => b.edgeId === targetEdge && b.instanceId !== draggedBox.instanceId
+  );
+
+  let targetIndex = 0;
+  let isVertical = true;
+  let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+  let badgeX = 0, badgeY = 0;
+
+  if (targetEdge === 'edge_A') {
+    isVertical = true;
+    onEdge.sort((a, b) => a.x - b.x);
+
+    targetIndex = onEdge.length;
+    for (let i = 0; i < onEdge.length; i++) {
+      const midX = onEdge[i].x + onEdge[i].width / 2;
+      if (modelX < midX) {
+        targetIndex = i;
+        break;
+      }
+    }
+
+    let lineX = 0;
+    const defaultY = tier === 'base' ? baseRowY : 0;
+    const defaultH = tier === 'base' ? depthA : upperDepth;
+
+    if (onEdge.length === 0) {
+      const cornerOffset =
+        shape === 'L' || shape === 'U'
+          ? layout.cornerOrientationAB === 'edge_A'
+            ? tier === 'base'
+              ? layout.cornerWidthBaseAB || 1000
+              : layout.cornerWidthUpperAB || 750
+            : tier === 'base'
+            ? layout.edgeB?.depth || 600
+            : upperDepth
+          : 0;
+      lineX = cornerOffset;
+      y1 = defaultY;
+      y2 = defaultY + defaultH;
+    } else if (targetIndex === 0) {
+      lineX = onEdge[0].x;
+      y1 = onEdge[0].y;
+      y2 = onEdge[0].y + onEdge[0].height;
+    } else if (targetIndex >= onEdge.length) {
+      const last = onEdge[onEdge.length - 1];
+      lineX = last.x + last.width;
+      y1 = last.y;
+      y2 = last.y + last.height;
+    } else {
+      lineX = onEdge[targetIndex].x;
+      y1 = onEdge[targetIndex].y;
+      y2 = onEdge[targetIndex].y + onEdge[targetIndex].height;
+    }
+
+    x1 = lineX;
+    x2 = lineX;
+    badgeX = lineX;
+    badgeY = y1 - 25;
+  } else {
+    // edge_B hoặc edge_C (xếp dọc theo trục Y)
+    isVertical = false;
+    onEdge.sort((a, b) => a.y - b.y);
+
+    targetIndex = onEdge.length;
+    for (let i = 0; i < onEdge.length; i++) {
+      const midY = onEdge[i].y + onEdge[i].height / 2;
+      if (modelY < midY) {
+        targetIndex = i;
+        break;
+      }
+    }
+
+    let lineY = 0;
+    const defaultX =
+      targetEdge === 'edge_B'
+        ? tier === 'upper' && is2Row
+          ? -(upperDepth + GAP)
+          : 0
+        : tier === 'upper' && is2Row
+        ? lengthA + GAP
+        : lengthA - depthC;
+    const defaultW =
+      tier === 'base' ? (targetEdge === 'edge_B' ? depthB : depthC) : upperDepth;
+
+    if (onEdge.length === 0) {
+      const cornerOffset =
+        targetEdge === 'edge_B'
+          ? layout.cornerOrientationAB === 'edge_B'
+            ? tier === 'base'
+              ? layout.cornerWidthBaseAB || 1000
+              : layout.cornerWidthUpperAB || 750
+            : tier === 'base'
+            ? depthA
+            : upperDepth
+          : layout.cornerOrientationAC === 'edge_C'
+          ? tier === 'base'
+            ? layout.cornerWidthBaseAC || 1000
+            : layout.cornerWidthUpperAC || 750
+          : tier === 'base'
+          ? depthA
+          : upperDepth;
+
+      lineY = (tier === 'base' ? baseRowY : 0) + cornerOffset;
+      x1 = defaultX;
+      x2 = defaultX + defaultW;
+    } else if (targetIndex === 0) {
+      lineY = onEdge[0].y;
+      x1 = onEdge[0].x;
+      x2 = onEdge[0].x + onEdge[0].width;
+    } else if (targetIndex >= onEdge.length) {
+      const last = onEdge[onEdge.length - 1];
+      lineY = last.y + last.height;
+      x1 = last.x;
+      x2 = last.x + last.width;
+    } else {
+      lineY = onEdge[targetIndex].y;
+      x1 = onEdge[targetIndex].x;
+      x2 = onEdge[targetIndex].x + onEdge[targetIndex].width;
+    }
+
+    y1 = lineY;
+    y2 = lineY;
+    badgeX = x1 + (x2 - x1) / 2;
+    badgeY = lineY - 20;
+  }
+
+  const edgeLabel =
+    targetEdge === 'edge_A'
+      ? 'Cạnh A'
+      : targetEdge === 'edge_B'
+      ? 'Cạnh B'
+      : 'Cạnh C';
+
+  const label = `▼ Vị trí #${targetIndex + 1} (${edgeLabel})`;
+
+  return {
+    edgeId: targetEdge,
+    targetIndex,
+    indicator: {
+      isVertical,
+      x1,
+      y1,
+      x2,
+      y2,
+      badgeX,
+      badgeY,
+      label,
+    },
+  };
+}
 import {
   ZoomIn,
   ZoomOut,
@@ -61,6 +340,122 @@ export const KitchenCanvas2D: React.FC = () => {
   const [isUpperModalOpen, setIsUpperModalOpen] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
+
+  // Trạng thái kéo thả tương tác trực quan (Interactive Drag & Drop)
+  const [dragCandidate, setDragCandidate] = useState<DragCandidate | null>(null);
+  const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
+
+  const dragCandidateRef = useRef<DragCandidate | null>(null);
+  dragCandidateRef.current = dragCandidate;
+
+  const activeDragRef = useRef<ActiveDragState | null>(null);
+  activeDragRef.current = activeDrag;
+
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+
+  const layout2DRef = useRef(calculateLayout2D(layout, activeCabinetTier));
+
+  const activeTierRef = useRef(activeCabinetTier);
+  activeTierRef.current = activeCabinetTier;
+
+  const panRef = useRef(pan);
+  panRef.current = pan;
+
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+
+  const handleStartDrag = (
+    box: Module2DBox,
+    tier: 'base' | 'upper',
+    clientX: number,
+    clientY: number
+  ) => {
+    setDragCandidate({ box, tier, startX: clientX, startY: clientY });
+  };
+
+  useEffect(() => {
+    if (!dragCandidate) return;
+
+    const onWindowMouseMove = (e: MouseEvent) => {
+      const candidate = dragCandidateRef.current;
+      if (!candidate || !containerRef.current) return;
+
+      const dx = e.clientX - candidate.startX;
+      const dy = e.clientY - candidate.startY;
+      if (!activeDragRef.current && Math.hypot(dx, dy) < 6) {
+        return;
+      }
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const canvasX = (e.clientX - rect.left - panRef.current.x) / zoomRef.current;
+      const canvasY = (e.clientY - rect.top - panRef.current.y) / zoomRef.current;
+
+      const currentLayout2D = layout2DRef.current;
+      const rootOffsetX = Math.max(80, -currentLayout2D.minX + 80);
+      const rootOffsetY = 100;
+      const modelX = canvasX - rootOffsetX;
+      const modelY = canvasY - rootOffsetY;
+
+      const dropTarget = calculateDropTarget({
+        modelX,
+        modelY,
+        tier: candidate.tier,
+        draggedBox: candidate.box,
+        layout: layoutRef.current,
+        layout2D: currentLayout2D,
+        activeCabinetTier: activeTierRef.current,
+      });
+
+      setActiveDrag({
+        box: candidate.box,
+        tier: candidate.tier,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        modelX,
+        modelY,
+        targetEdge: dropTarget.edgeId,
+        targetIndex: dropTarget.targetIndex,
+        indicator: dropTarget.indicator,
+      });
+    };
+
+    const onWindowMouseUp = (_e: MouseEvent) => {
+      const currentActive = activeDragRef.current;
+      const currentCandidate = dragCandidateRef.current;
+
+      if (currentActive) {
+        moveModule(
+          currentActive.box.instanceId,
+          currentActive.targetEdge,
+          currentActive.targetIndex
+        );
+        setSelectedModuleId(currentActive.box.instanceId);
+      } else if (currentCandidate) {
+        setSelectedModuleId(currentCandidate.box.instanceId);
+      }
+
+      setDragCandidate(null);
+      setActiveDrag(null);
+    };
+
+    const onWindowKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setDragCandidate(null);
+        setActiveDrag(null);
+      }
+    };
+
+    window.addEventListener('mousemove', onWindowMouseMove);
+    window.addEventListener('mouseup', onWindowMouseUp);
+    window.addEventListener('keydown', onWindowKeyDown);
+
+    return () => {
+      window.removeEventListener('mousemove', onWindowMouseMove);
+      window.removeEventListener('mouseup', onWindowMouseUp);
+      window.removeEventListener('keydown', onWindowKeyDown);
+    };
+  }, [dragCandidate, moveModule, setSelectedModuleId]);
 
   // Tính toán dữ liệu hình học 2D theo phân tầng
   const layout2D = calculateLayout2D(layout, activeCabinetTier);
@@ -305,7 +700,9 @@ export const KitchenCanvas2D: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      className="relative flex-1 h-full w-full bg-slate-950 overflow-hidden cursor-grab active:cursor-grabbing select-none"
+      className={`relative flex-1 h-full w-full bg-slate-950 overflow-hidden select-none ${
+        activeDrag ? 'cursor-grabbing' : 'cursor-default'
+      }`}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -576,6 +973,9 @@ export const KitchenCanvas2D: React.FC = () => {
           </filter>
           <filter id="gap-glow-upper" x="-20%" y="-20%" width="140%" height="140%">
             <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#f59e0b" floodOpacity="0.8" />
+          </filter>
+          <filter id="drop-indicator-glow" x="-40%" y="-40%" width="180%" height="180%">
+            <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#06b6d4" floodOpacity="0.95" />
           </filter>
         </defs>
 
@@ -1095,11 +1495,13 @@ export const KitchenCanvas2D: React.FC = () => {
                   placedModule={placed}
                   isSelected={selectedModuleId === box.instanceId}
                   isViolated={violatedInstanceIds.has(box.instanceId)}
+                  isBeingDragged={activeDrag?.box.instanceId === box.instanceId}
                   onSelect={(id) => setSelectedModuleId(id)}
                   onDelete={(id) => removePlacedModule(id)}
                   onMoveLeft={handleMoveLeft}
                   onMoveRight={handleMoveRight}
                   onReorder={handleReorder}
+                  onStartDrag={(b, cx, cy) => handleStartDrag(b, 'base', cx, cy)}
                 />
               );
             })}
@@ -1119,11 +1521,13 @@ export const KitchenCanvas2D: React.FC = () => {
                   placedModule={placed}
                   isSelected={selectedModuleId === box.instanceId}
                   isViolated={violatedInstanceIds.has(box.instanceId)}
+                  isBeingDragged={activeDrag?.box.instanceId === box.instanceId}
                   onSelect={(id) => setSelectedModuleId(id)}
                   onDelete={(id) => removePlacedModule(id)}
                   onMoveLeft={handleMoveLeft}
                   onMoveRight={handleMoveRight}
                   onReorder={handleReorder}
+                  onStartDrag={(b, cx, cy) => handleStartDrag(b, 'upper', cx, cy)}
                 />
               );
             })}
@@ -1732,6 +2136,148 @@ export const KitchenCanvas2D: React.FC = () => {
                   </text>
                 </g>
               )}
+            </g>
+          )}
+
+          {/* 6. HIỆU ỨNG KÉO THẢ KHOANG CÔNG NĂNG (DRAG & DROP DROP-ZONE & FLOATING GHOST) */}
+          {activeDrag && (
+            <g className="interactive-drag-overlay pointer-events-none">
+              {/* 6.1 Vạch chỉ thị vị trí thả (Pulsing Neon Insertion Marker Line) */}
+              {activeDrag.indicator.isVertical ? (
+                <g>
+                  {/* Vệt phát sáng nền */}
+                  <line
+                    x1={activeDrag.indicator.x1}
+                    y1={activeDrag.indicator.y1 - 35}
+                    x2={activeDrag.indicator.x2}
+                    y2={activeDrag.indicator.y2 + 35}
+                    stroke="#06b6d4"
+                    strokeWidth="12"
+                    strokeLinecap="round"
+                    opacity="0.65"
+                    filter="url(#drop-indicator-glow)"
+                  />
+                  {/* Lõi sáng neon trắng */}
+                  <line
+                    x1={activeDrag.indicator.x1}
+                    y1={activeDrag.indicator.y1 - 35}
+                    x2={activeDrag.indicator.x2}
+                    y2={activeDrag.indicator.y2 + 35}
+                    stroke="#ffffff"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                  />
+                </g>
+              ) : (
+                <g>
+                  {/* Vệt phát sáng nền */}
+                  <line
+                    x1={activeDrag.indicator.x1 - 35}
+                    y1={activeDrag.indicator.y1}
+                    x2={activeDrag.indicator.x2 + 35}
+                    y2={activeDrag.indicator.y2}
+                    stroke="#06b6d4"
+                    strokeWidth="12"
+                    strokeLinecap="round"
+                    opacity="0.65"
+                    filter="url(#drop-indicator-glow)"
+                  />
+                  {/* Lõi sáng neon trắng */}
+                  <line
+                    x1={activeDrag.indicator.x1 - 35}
+                    y1={activeDrag.indicator.y1}
+                    x2={activeDrag.indicator.x2 + 35}
+                    y2={activeDrag.indicator.y2}
+                    stroke="#ffffff"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                  />
+                </g>
+              )}
+
+              {/* 6.2 Badge thông báo vị trí thả (Drop Position Pill Badge) */}
+              <g transform={`translate(${activeDrag.indicator.badgeX}, ${activeDrag.indicator.badgeY})`}>
+                <rect
+                  x="-120"
+                  y="-32"
+                  width="240"
+                  height="42"
+                  rx="21"
+                  fill="#0284c7"
+                  stroke="#ffffff"
+                  strokeWidth="2.5"
+                  filter="url(#drop-indicator-glow)"
+                />
+                <text
+                  x="0"
+                  y="-5"
+                  textAnchor="middle"
+                  fill="#ffffff"
+                  fontSize="20"
+                  fontWeight="900"
+                >
+                  {activeDrag.indicator.label}
+                </text>
+              </g>
+
+              {/* 6.3 Bóng ma khoang đang kéo (Floating Ghost Preview) */}
+              <g
+                transform={`translate(${activeDrag.modelX - activeDrag.box.width / 2}, ${
+                  activeDrag.modelY - activeDrag.box.height / 2
+                })`}
+              >
+                {/* Khung viền mờ của module */}
+                <rect
+                  x={0}
+                  y={0}
+                  width={activeDrag.box.width}
+                  height={activeDrag.box.height}
+                  rx="8"
+                  fill="#0284c7"
+                  fillOpacity="0.25"
+                  stroke="#38bdf8"
+                  strokeWidth="3.5"
+                  strokeDasharray="8 6"
+                  filter="url(#drop-indicator-glow)"
+                />
+
+                {/* HUD Card thông số khoang bay theo chuột */}
+                <g transform={`translate(${activeDrag.box.width / 2}, ${activeDrag.box.height / 2})`}>
+                  <rect
+                    x="-145"
+                    y="-34"
+                    width="290"
+                    height="68"
+                    rx="14"
+                    fill="#090d16"
+                    fillOpacity="0.95"
+                    stroke="#38bdf8"
+                    strokeWidth="2.5"
+                    filter="url(#drop-indicator-glow)"
+                  />
+                  <text
+                    x="0"
+                    y="-8"
+                    textAnchor="middle"
+                    fill="#f8fafc"
+                    fontSize="20"
+                    fontWeight="800"
+                  >
+                    [{activeDrag.box.code}] {activeDrag.box.name}
+                  </text>
+                  <text
+                    x="0"
+                    y="20"
+                    textAnchor="middle"
+                    fill="#38bdf8"
+                    fontSize="17"
+                    fontWeight="800"
+                    fontFamily="monospace"
+                  >
+                    {activeDrag.box.width} × {activeDrag.box.height} mm
+                  </text>
+                </g>
+              </g>
             </g>
           )}
         </g>

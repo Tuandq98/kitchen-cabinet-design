@@ -1929,7 +1929,8 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
           edgeId: targetEdgeId,
         };
 
-        newEdgeModules.splice(targetIndex, 0, updatedTarget);
+        const clampedIndex = Math.max(0, Math.min(newEdgeModules.length, targetIndex));
+        newEdgeModules.splice(clampedIndex, 0, updatedTarget);
         const reindexedNew = newEdgeModules.map((m, idx) => ({
           ...m,
           positionIndex: idx,
@@ -1982,7 +1983,8 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
           edgeId: targetEdgeId,
         };
 
-        newEdgeModules.splice(targetIndex, 0, updatedTarget);
+        const clampedIndex = Math.max(0, Math.min(newEdgeModules.length, targetIndex));
+        newEdgeModules.splice(clampedIndex, 0, updatedTarget);
         const reindexedNew = newEdgeModules.map((m, idx) => ({
           ...m,
           positionIndex: idx,

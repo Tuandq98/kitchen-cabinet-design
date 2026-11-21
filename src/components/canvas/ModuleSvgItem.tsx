@@ -7,11 +7,13 @@ interface ModuleSvgItemProps {
   placedModule: PlacedModuleInstance;
   isSelected: boolean;
   isViolated: boolean;
+  isBeingDragged?: boolean;
   onSelect: (instanceId: string) => void;
   onDelete: (instanceId: string) => void;
   onMoveLeft: (instanceId: string) => void;
   onMoveRight: (instanceId: string) => void;
   onReorder?: (sourceInstanceId: string, targetInstanceId: string) => void;
+  onStartDrag?: (box: Module2DBox, clientX: number, clientY: number) => void;
 }
 
 export const ModuleSvgItem: React.FC<ModuleSvgItemProps> = ({
@@ -19,11 +21,13 @@ export const ModuleSvgItem: React.FC<ModuleSvgItemProps> = ({
   placedModule,
   isSelected,
   isViolated,
+  isBeingDragged = false,
   onSelect,
   onDelete,
   onMoveLeft,
   onMoveRight,
   onReorder,
+  onStartDrag,
 }) => {
   const { x, y, width, height, code, name, category, rotation } = box;
 
@@ -692,26 +696,11 @@ export const ModuleSvgItem: React.FC<ModuleSvgItemProps> = ({
 
   return (
     <g
-      className="cursor-pointer select-none"
-      {...({ draggable: true } as any)}
-      onDragStart={(e) => {
-        e.stopPropagation();
-        e.dataTransfer.setData('application/kitchen-placed-instance', box.instanceId);
-        e.dataTransfer.setData('application/kitchen-tier', placedModule.tier || 'base');
-        e.dataTransfer.setData('application/kitchen-edge', box.edgeId);
-        e.dataTransfer.effectAllowed = 'move';
-      }}
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        e.dataTransfer.dropEffect = 'move';
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const draggedInstanceId = e.dataTransfer.getData('application/kitchen-placed-instance');
-        if (draggedInstanceId && draggedInstanceId !== box.instanceId) {
-          onReorder?.(draggedInstanceId, box.instanceId);
+      className={`select-none ${isBeingDragged ? 'opacity-30 cursor-grabbing' : 'cursor-grab'}`}
+      onMouseDown={(e) => {
+        if (e.button === 0) {
+          e.stopPropagation();
+          onStartDrag?.(box, e.clientX, e.clientY);
         }
       }}
       onClick={(e) => {
@@ -731,10 +720,12 @@ export const ModuleSvgItem: React.FC<ModuleSvgItemProps> = ({
             ? '#ef4444'
             : isSelected
             ? '#38bdf8'
+            : isBeingDragged
+            ? '#06b6d4'
             : '#475569'
         }
-        strokeWidth={isSelected || isViolated ? '3' : '1.5'}
-        strokeDasharray={isViolated ? '6 3' : undefined}
+        strokeWidth={isSelected || isViolated || isBeingDragged ? '3' : '1.5'}
+        strokeDasharray={isViolated ? '6 3' : isBeingDragged ? '8 4' : undefined}
         rx="2"
       />
 
@@ -765,6 +756,30 @@ export const ModuleSvgItem: React.FC<ModuleSvgItemProps> = ({
         >
           {code}
         </text>
+
+        {/* Biểu tượng Kéo Thả (Drag Grip Handle) */}
+        {width >= 200 && (
+          <g transform={`translate(${x + Math.min(125, width - 42)}, ${y + 18})`}>
+            <rect
+              x="0"
+              y="0"
+              width="30"
+              height="40"
+              rx="8"
+              fill="#0f172a"
+              fillOpacity="0.85"
+              stroke="#334155"
+              strokeWidth="1.5"
+            />
+            {/* 6 dots grip icon */}
+            <circle cx="10" cy="12" r="2.2" fill="#94a3b8" />
+            <circle cx="20" cy="12" r="2.2" fill="#94a3b8" />
+            <circle cx="10" cy="20" r="2.2" fill="#94a3b8" />
+            <circle cx="20" cy="20" r="2.2" fill="#94a3b8" />
+            <circle cx="10" cy="28" r="2.2" fill="#94a3b8" />
+            <circle cx="20" cy="28" r="2.2" fill="#94a3b8" />
+          </g>
+        )}
 
         {/* Tên Khoang Công Năng - Cỡ chữ to lớn (50-56mm), Nền tương phản cao */}
         <g transform={`translate(${x + width / 2}, ${y + height / 2 + 10})`}>
