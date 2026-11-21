@@ -983,6 +983,133 @@ export const KitchenCanvas2D: React.FC = () => {
               </g>
             ))}
 
+          {/* 5.2 CÁC KHOẢNG TRỐNG CÒN LẠI CỦA TỦ DƯỚI (BASE EMPTY GAPS) */}
+          {(activeCabinetTier === 'all' || activeCabinetTier === 'base') &&
+            layout2D.baseGaps &&
+            layout2D.baseGaps.map((gap) => (
+              <g key={gap.id} className="base-empty-gap">
+                {/* Khung ô khoảng trống nét đứt màu xanh dương kiến trúc */}
+                <rect
+                  x={gap.x}
+                  y={gap.y}
+                  width={gap.width}
+                  height={gap.height}
+                  fill="#0284c7"
+                  fillOpacity="0.08"
+                  stroke="#0284c7"
+                  strokeWidth="1.8"
+                  strokeDasharray="6 4"
+                  rx="4"
+                />
+
+                {/* Vạch chéo kỹ thuật thể hiện khoảng không chờ */}
+                <line
+                  x1={gap.x}
+                  y1={gap.y}
+                  x2={gap.x + gap.width}
+                  y2={gap.y + gap.height}
+                  stroke="#0284c7"
+                  strokeOpacity="0.2"
+                  strokeWidth="1"
+                  strokeDasharray="4 4"
+                />
+                <line
+                  x1={gap.x + gap.width}
+                  y1={gap.y}
+                  x2={gap.x}
+                  y2={gap.y + gap.height}
+                  stroke="#0284c7"
+                  strokeOpacity="0.2"
+                  strokeWidth="1"
+                  strokeDasharray="4 4"
+                />
+
+                {/* Badge hiển thị độ rộng khoảng trống chuẩn xác mm */}
+                <g
+                  transform={`translate(${gap.centerX}, ${gap.centerY}) rotate(${gap.rotation || 0})`}
+                  className="pointer-events-none"
+                >
+                  {gap.gapMm >= 180 ? (
+                    <>
+                      <rect
+                        x="-72"
+                        y="-16"
+                        width="144"
+                        height="32"
+                        rx="8"
+                        fill="#18181b"
+                        fillOpacity="0.96"
+                        stroke="#0284c7"
+                        strokeWidth="1.5"
+                      />
+                      <text
+                        x="0"
+                        y="5"
+                        textAnchor="middle"
+                        fill="#38bdf8"
+                        fontSize="13"
+                        fontWeight="800"
+                        fontFamily="monospace"
+                        letterSpacing="0.5px"
+                      >
+                        TRỐNG: {gap.gapMm} mm
+                      </text>
+                    </>
+                  ) : gap.gapMm >= 80 ? (
+                    <>
+                      <rect
+                        x="-48"
+                        y="-14"
+                        width="96"
+                        height="28"
+                        rx="6"
+                        fill="#18181b"
+                        fillOpacity="0.96"
+                        stroke="#0284c7"
+                        strokeWidth="1.5"
+                      />
+                      <text
+                        x="0"
+                        y="4"
+                        textAnchor="middle"
+                        fill="#38bdf8"
+                        fontSize="12"
+                        fontWeight="800"
+                        fontFamily="monospace"
+                      >
+                        Trống {gap.gapMm}
+                      </text>
+                    </>
+                  ) : (
+                    <>
+                      <rect
+                        x="-30"
+                        y="-12"
+                        width="60"
+                        height="24"
+                        rx="5"
+                        fill="#18181b"
+                        fillOpacity="0.96"
+                        stroke="#0284c7"
+                        strokeWidth="1.5"
+                      />
+                      <text
+                        x="0"
+                        y="4"
+                        textAnchor="middle"
+                        fill="#38bdf8"
+                        fontSize="11"
+                        fontWeight="800"
+                        fontFamily="monospace"
+                      >
+                        {gap.gapMm}
+                      </text>
+                    </>
+                  )}
+                </g>
+              </g>
+            ))}
+
           {/* 6. ĐƯỜNG GIÓNG CĂN TIM (ALIGNMENT GUIDE LINES) GIỮA TỦ DƯỚI & TỦ TRÊN */}
           {activeCabinetTier === 'all' && (() => {
             const cook = layout2D.modules.find((m) => m.code === 'B01');

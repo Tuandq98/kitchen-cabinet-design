@@ -4,7 +4,7 @@ import {
   getUpperModuleSpaceInfo,
   getBaseModuleSpaceInfo,
 } from '../../store/useKitchenStore';
-import { computeUpperGaps } from '../../utils/geometry';
+import { computeUpperGaps, computeBaseGaps } from '../../utils/geometry';
 import {
   ShieldAlert,
   CheckCircle2,
@@ -69,6 +69,10 @@ export const RightSidebar: React.FC = () => {
   const baseSpaceInfo = isBaseT01Selected
     ? getBaseModuleSpaceInfo(selectedModule.instanceId, layout)
     : null;
+
+  // Danh sách các khoảng trống còn lại của hệ tủ dưới
+  const allBaseGaps = computeBaseGaps(layout);
+  const totalBaseGapsMm = allBaseGaps.reduce((sum, g) => sum + g.gapMm, 0);
 
   // Danh sách các khoảng trống còn lại của hệ tủ trên
   const allUpperGaps = computeUpperGaps(layout);
@@ -672,6 +676,49 @@ export const RightSidebar: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* 1.4 BẢNG THỐNG KÊ KHOẢNG TRỐNG TỦ DƯỚI (BASE EMPTY GAPS OVERVIEW) */}
+      {layout.placedModules.length > 0 && (
+        <div className="p-3 border-b border-slate-800 bg-slate-950/20 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+              <Ruler className="w-3.5 h-3.5 text-sky-400" />
+              <span>Khoảng trống Tủ Dưới còn lại</span>
+            </span>
+            <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
+              Tổng: {totalBaseGapsMm} mm
+            </span>
+          </div>
+
+          {allBaseGaps.length > 0 ? (
+            <div className="space-y-1.5 max-h-36 overflow-y-auto">
+              {allBaseGaps.map((gap, idx) => (
+                <div
+                  key={gap.id}
+                  className="flex items-center justify-between py-1 px-2 rounded-lg bg-slate-900/80 border border-slate-800 text-[11px]"
+                >
+                  <span className="text-slate-400">
+                    {gap.edgeId === 'edge_A'
+                      ? 'Cạnh A'
+                      : gap.edgeId === 'edge_B'
+                      ? 'Cạnh B'
+                      : 'Cạnh C'}{' '}
+                    • Khoảng #{idx + 1}
+                  </span>
+                  <span className="font-mono font-bold text-sky-300">
+                    {gap.gapMm} mm
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-[11px] text-emerald-400 py-1 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              <span>Hệ tủ dưới đã được lấp đầy hoàn hảo (0 mm trống).</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 1.5 BẢNG THỐNG KÊ KHOẢNG TRỐNG TỦ TRÊN (EMPTY GAPS OVERVIEW) */}
       {(layout.placedUpperModules || []).length > 0 && (

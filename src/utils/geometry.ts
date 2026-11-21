@@ -37,12 +37,26 @@ export interface UpperGapBox {
   rotation?: number;
 }
 
+export interface BaseGapBox {
+  id: string;
+  edgeId: EdgeId;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  gapMm: number;
+  centerX: number;
+  centerY: number;
+  rotation?: number;
+}
+
 export interface Layout2DBounds {
   modules: Module2DBox[];
   corners: CornerBox[];
   upperModules: Module2DBox[];
   upperCorners: CornerBox[];
   upperGaps: UpperGapBox[];
+  baseGaps: BaseGapBox[];
   totalWidth: number;
   totalHeight: number;
   minX: number;
@@ -221,6 +235,303 @@ export function computeUpperGaps(
 }
 
 /**
+ * Tính toán danh sách các ô khoảng trống còn lại (Empty Gaps) trên hệ tủ dưới
+ */
+export function computeBaseGaps(
+  layout: KitchenLayout,
+  tier: 'all' | 'base' | 'upper' = 'all'
+): BaseGapBox[] {
+  if (tier === 'upper') return [];
+
+  const depthA = layout.edgeA.depth || 600;
+  const depthB = layout.edgeB?.depth || 600;
+  const depthC = layout.edgeC?.depth || 600;
+  const upperDepth = layout.upperDepth || 350;
+  const GAP = 150;
+  const is2Row = tier === 'all';
+  const baseRowY = is2Row ? upperDepth + GAP : 0;
+
+  const gaps: BaseGapBox[] = [];
+  let gapIdx = 0;
+
+  if (layout.shape === 'I') {
+    const lengthA = layout.edgeA.length;
+    const modulesA = layout.placedModules
+      .filter((m) => m.edgeId === 'edge_A')
+      .sort((a, b) => a.offset - b.offset);
+
+    let ptr = 0;
+    for (const m of modulesA) {
+      if (m.offset > ptr + 5) {
+        const gapMm = m.offset - ptr;
+        if (gapMm >= 10) {
+          gaps.push({
+            id: `base_gap_edge_A_${gapIdx++}`,
+            edgeId: 'edge_A',
+            x: ptr,
+            y: baseRowY,
+            width: gapMm,
+            height: depthA,
+            gapMm: Math.round(gapMm),
+            centerX: ptr + gapMm / 2,
+            centerY: baseRowY + depthA / 2,
+            rotation: 0,
+          });
+        }
+      }
+      ptr = Math.max(ptr, m.offset + m.width);
+    }
+    if (lengthA > ptr + 5) {
+      const gapMm = lengthA - ptr;
+      if (gapMm >= 10) {
+        gaps.push({
+          id: `base_gap_edge_A_${gapIdx++}`,
+          edgeId: 'edge_A',
+          x: ptr,
+          y: baseRowY,
+          width: gapMm,
+          height: depthA,
+          gapMm: Math.round(gapMm),
+          centerX: ptr + gapMm / 2,
+          centerY: baseRowY + depthA / 2,
+          rotation: 0,
+        });
+      }
+    }
+  } else if (layout.shape === 'L') {
+    const lengthA = layout.edgeA.length;
+    const lengthB = layout.edgeB ? layout.edgeB.length : 2400;
+
+    // Cạnh A: bắt đầu sau góc depthB
+    const modulesA = layout.placedModules
+      .filter((m) => m.edgeId === 'edge_A')
+      .sort((a, b) => a.offset - b.offset);
+
+    let ptrA = depthB;
+    for (const m of modulesA) {
+      if (m.offset > ptrA + 5) {
+        const gapMm = m.offset - ptrA;
+        if (gapMm >= 10) {
+          gaps.push({
+            id: `base_gap_edge_A_${gapIdx++}`,
+            edgeId: 'edge_A',
+            x: ptrA,
+            y: baseRowY,
+            width: gapMm,
+            height: depthA,
+            gapMm: Math.round(gapMm),
+            centerX: ptrA + gapMm / 2,
+            centerY: baseRowY + depthA / 2,
+            rotation: 0,
+          });
+        }
+      }
+      ptrA = Math.max(ptrA, m.offset + m.width);
+    }
+    if (lengthA > ptrA + 5) {
+      const gapMm = lengthA - ptrA;
+      if (gapMm >= 10) {
+        gaps.push({
+          id: `base_gap_edge_A_${gapIdx++}`,
+          edgeId: 'edge_A',
+          x: ptrA,
+          y: baseRowY,
+          width: gapMm,
+          height: depthA,
+          gapMm: Math.round(gapMm),
+          centerX: ptrA + gapMm / 2,
+          centerY: baseRowY + depthA / 2,
+          rotation: 0,
+        });
+      }
+    }
+
+    // Cạnh B: bắt đầu sau góc depthA (chạy dọc từ trên xuống)
+    const modulesB = layout.placedModules
+      .filter((m) => m.edgeId === 'edge_B')
+      .sort((a, b) => a.offset - b.offset);
+
+    let ptrB = depthA;
+    for (const m of modulesB) {
+      if (m.offset > ptrB + 5) {
+        const gapMm = m.offset - ptrB;
+        if (gapMm >= 10) {
+          gaps.push({
+            id: `base_gap_edge_B_${gapIdx++}`,
+            edgeId: 'edge_B',
+            x: 0,
+            y: baseRowY + ptrB,
+            width: depthB,
+            height: gapMm,
+            gapMm: Math.round(gapMm),
+            centerX: depthB / 2,
+            centerY: baseRowY + ptrB + gapMm / 2,
+            rotation: 90,
+          });
+        }
+      }
+      ptrB = Math.max(ptrB, m.offset + m.width);
+    }
+    if (lengthB > ptrB + 5) {
+      const gapMm = lengthB - ptrB;
+      if (gapMm >= 10) {
+        gaps.push({
+          id: `base_gap_edge_B_${gapIdx++}`,
+          edgeId: 'edge_B',
+          x: 0,
+          y: baseRowY + ptrB,
+          width: depthB,
+          height: gapMm,
+          gapMm: Math.round(gapMm),
+          centerX: depthB / 2,
+          centerY: baseRowY + ptrB + gapMm / 2,
+          rotation: 90,
+        });
+      }
+    }
+  } else if (layout.shape === 'U') {
+    const lengthA = layout.edgeA.length;
+    const lengthB = layout.edgeB ? layout.edgeB.length : 2400;
+    const lengthC = layout.edgeC ? layout.edgeC.length : 2400;
+
+    // Cạnh B (trái)
+    const modulesB = layout.placedModules
+      .filter((m) => m.edgeId === 'edge_B')
+      .sort((a, b) => a.offset - b.offset);
+
+    let ptrB = depthA;
+    for (const m of modulesB) {
+      if (m.offset > ptrB + 5) {
+        const gapMm = m.offset - ptrB;
+        if (gapMm >= 10) {
+          gaps.push({
+            id: `base_gap_edge_B_${gapIdx++}`,
+            edgeId: 'edge_B',
+            x: 0,
+            y: baseRowY + ptrB,
+            width: depthB,
+            height: gapMm,
+            gapMm: Math.round(gapMm),
+            centerX: depthB / 2,
+            centerY: baseRowY + ptrB + gapMm / 2,
+            rotation: 90,
+          });
+        }
+      }
+      ptrB = Math.max(ptrB, m.offset + m.width);
+    }
+    if (lengthB > ptrB + 5) {
+      const gapMm = lengthB - ptrB;
+      if (gapMm >= 10) {
+        gaps.push({
+          id: `base_gap_edge_B_${gapIdx++}`,
+          edgeId: 'edge_B',
+          x: 0,
+          y: baseRowY + ptrB,
+          width: depthB,
+          height: gapMm,
+          gapMm: Math.round(gapMm),
+          centerX: depthB / 2,
+          centerY: baseRowY + ptrB + gapMm / 2,
+          rotation: 90,
+        });
+      }
+    }
+
+    // Cạnh A (giữa)
+    const endA = lengthA - depthC;
+    const modulesA = layout.placedModules
+      .filter((m) => m.edgeId === 'edge_A')
+      .sort((a, b) => a.offset - b.offset);
+
+    let ptrA = depthB;
+    for (const m of modulesA) {
+      if (m.offset > ptrA + 5) {
+        const gapMm = m.offset - ptrA;
+        if (gapMm >= 10) {
+          gaps.push({
+            id: `base_gap_edge_A_${gapIdx++}`,
+            edgeId: 'edge_A',
+            x: ptrA,
+            y: baseRowY,
+            width: gapMm,
+            height: depthA,
+            gapMm: Math.round(gapMm),
+            centerX: ptrA + gapMm / 2,
+            centerY: baseRowY + depthA / 2,
+            rotation: 0,
+          });
+        }
+      }
+      ptrA = Math.max(ptrA, m.offset + m.width);
+    }
+    if (endA > ptrA + 5) {
+      const gapMm = endA - ptrA;
+      if (gapMm >= 10) {
+        gaps.push({
+          id: `base_gap_edge_A_${gapIdx++}`,
+          edgeId: 'edge_A',
+          x: ptrA,
+          y: baseRowY,
+          width: gapMm,
+          height: depthA,
+          gapMm: Math.round(gapMm),
+          centerX: ptrA + gapMm / 2,
+          centerY: baseRowY + depthA / 2,
+          rotation: 0,
+        });
+      }
+    }
+
+    // Cạnh C (phải)
+    const modulesC = layout.placedModules
+      .filter((m) => m.edgeId === 'edge_C')
+      .sort((a, b) => a.offset - b.offset);
+
+    let ptrC = depthA;
+    for (const m of modulesC) {
+      if (m.offset > ptrC + 5) {
+        const gapMm = m.offset - ptrC;
+        if (gapMm >= 10) {
+          gaps.push({
+            id: `base_gap_edge_C_${gapIdx++}`,
+            edgeId: 'edge_C',
+            x: lengthA - depthC,
+            y: baseRowY + ptrC,
+            width: depthC,
+            height: gapMm,
+            gapMm: Math.round(gapMm),
+            centerX: lengthA - depthC / 2,
+            centerY: baseRowY + ptrC + gapMm / 2,
+            rotation: -90,
+          });
+        }
+      }
+      ptrC = Math.max(ptrC, m.offset + m.width);
+    }
+    if (lengthC > ptrC + 5) {
+      const gapMm = lengthC - ptrC;
+      if (gapMm >= 10) {
+        gaps.push({
+          id: `base_gap_edge_C_${gapIdx++}`,
+          edgeId: 'edge_C',
+          x: lengthA - depthC,
+          y: baseRowY + ptrC,
+          width: depthC,
+          height: gapMm,
+          gapMm: Math.round(gapMm),
+          centerX: lengthA - depthC / 2,
+          centerY: baseRowY + ptrC + gapMm / 2,
+          rotation: -90,
+        });
+      }
+    }
+  }
+
+  return gaps;
+}
+
+/**
  * Tính toán tọa độ 2D (CAD Floor Plan) cho tất cả các khoang và góc nối
  * Chuẩn kiến trúc:
  * - Bếp chữ I: 1 cạnh ngang (Cạnh A)
@@ -319,6 +630,7 @@ export function calculateLayout2D(
       upperModules: upperModules2D,
       upperCorners: [],
       upperGaps: computeUpperGaps(layout, tier),
+      baseGaps: computeBaseGaps(layout, tier),
       totalWidth: lengthA,
       totalHeight,
       minX: 0,
@@ -484,6 +796,7 @@ export function calculateLayout2D(
         upperModules: upperModules2D,
         upperCorners,
         upperGaps: computeUpperGaps(layout, tier),
+      baseGaps: computeBaseGaps(layout, tier),
         totalWidth: lengthA + Math.abs(upperOffsetX),
         totalHeight: Math.max(lengthB + baseRowY, lengthB),
         minX: upperOffsetX,
@@ -635,6 +948,7 @@ export function calculateLayout2D(
         upperModules: upperModules2D,
         upperCorners,
         upperGaps: computeUpperGaps(layout, tier),
+      baseGaps: computeBaseGaps(layout, tier),
         totalWidth: lengthA,
         totalHeight: lengthB,
         minX: 0,
@@ -845,6 +1159,7 @@ export function calculateLayout2D(
       upperModules: upperModules2D,
       upperCorners,
       upperGaps: computeUpperGaps(layout, tier),
+      baseGaps: computeBaseGaps(layout, tier),
       totalWidth: lengthA + Math.abs(upperOffsetX) + GAP + upperDepth,
       totalHeight: Math.max(lengthB, lengthC) + baseRowY,
       minX: upperOffsetX,
@@ -1044,6 +1359,7 @@ export function calculateLayout2D(
       upperModules: upperModules2D,
       upperCorners,
       upperGaps: computeUpperGaps(layout, tier),
+      baseGaps: computeBaseGaps(layout, tier),
       totalWidth: lengthA,
       totalHeight: Math.max(lengthB, lengthC),
       minX: 0,
