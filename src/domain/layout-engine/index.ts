@@ -710,7 +710,8 @@ export class LayoutEngine {
     const filterCodes = (codes: string[]) =>
       codes.filter((c) => selectedCodes.includes(c));
 
-    // Bếp chữ U kinh điển:
+    // Bếp chữ U: Thiết kế các phương án công thái học chuẩn NKBA & Tam giác công năng
+    // Phân bổ hợp lý: Tủ lạnh (F01) ở rìa Cạnh B, Chậu (S01) & Chuẩn bị (C01) ở Cạnh A, Bếp (B01) & Tủ cao (P01, A01) ở Cạnh C
     const strategies = [
       {
         id: 'strat-u-opt1',
@@ -725,21 +726,50 @@ export class LayoutEngine {
           'Tủ lạnh ở rìa Cạnh B cân đối hoàn hảo với khối tủ cao kề nhau ở rìa Cạnh C',
           'Đạt tỉ lệ tam giác công năng hoàn hảo nhất',
         ],
-        cons: ['Cần không gian bếp rộng rãi'],
+        cons: ['Cần Cạnh A đủ rộng (tối thiểu 3.0m - 3.4m) để chứa cả chậu và máy rửa bát'],
       },
       {
         id: 'strat-u-opt2',
-        title: 'Phương án 2: Bếp nấu ở giữa Cạnh A, Chậu & Tủ lạnh Cạnh B, Khối tủ cao Cạnh C',
+        title: 'Phương án 2: Bếp chữ U tối ưu không gian - Máy rửa bát kề chậu sang Cạnh B, Bếp & Tủ cao Cạnh C',
         assign: {
-          edgeB: filterCodes(['W01', 'S01', 'D01', 'T01', 'F01']),
-          edgeA: filterCodes(['C01', 'B01', 'SP01', 'M01', 'T01']),
-          edgeC: filterCodes(['T01', 'P01', 'A01']),
+          edgeB: filterCodes(['D01', 'T01', 'F01']),
+          edgeA: filterCodes(['W01', 'S01', 'C01']),
+          edgeC: filterCodes(['R01', 'B01', 'SP01', 'M01', 'T01', 'P01', 'A01']),
+        },
+        pros: [
+          'Chậu rửa và khu sơ chế Cạnh A rộng rãi, máy rửa bát đặt cạnh góc Cạnh B cực kỳ thuận tiện',
+          'Tủ lạnh ở rìa Cạnh B đối trọng cân đối với Khối tủ cao kề nhau ở rìa Cạnh C',
+          'Phù hợp với hầu hết kích thước bếp chữ U thực tế (Cạnh A từ 2.4m - 3.0m)',
+        ],
+        cons: ['Máy rửa bát đặt sang cạnh bên vuông góc với chậu'],
+      },
+      {
+        id: 'strat-u-opt3',
+        title: 'Phương án 3: Bếp nấu ở giữa Cạnh A, Chậu & Máy rửa bát Cạnh B, Tủ lạnh & Khối tủ cao Cạnh C',
+        assign: {
+          edgeB: filterCodes(['W01', 'S01', 'D01', 'C01', 'T01']),
+          edgeA: filterCodes(['B01', 'SP01', 'M01', 'T01']),
+          edgeC: filterCodes(['R01', 'F01', 'P01', 'A01']),
         },
         pros: [
           'Khu vực nấu nướng là tâm điểm chú ý ở Cạnh A',
-          'Tủ lạnh Cạnh B đối trọng cân đối với Khối tủ cao kề nhau ở Cạnh C',
+          'Chậu và máy rửa bát tập trung gọn gàng tại Cạnh B',
         ],
         cons: ['Cần ống hút mùi thoát thẳng hoặc chạy qua trần giả cạnh A'],
+      },
+      {
+        id: 'strat-u-opt4',
+        title: 'Phương án 4: Bếp chữ U phân bổ linh hoạt - Tủ lạnh Cạnh B, Chậu Cạnh A, Bếp Cạnh C',
+        assign: {
+          edgeB: filterCodes(['T01', 'D01', 'F01']),
+          edgeA: filterCodes(['C01', 'S01', 'W01']),
+          edgeC: filterCodes(['SP01', 'B01', 'M01', 'R01', 'P01', 'A01']),
+        },
+        pros: [
+          'Tối ưu luồng di chuyển: Lưu trữ (B) -> Sơ chế (A) -> Nấu nướng (C)',
+          'Khối tủ cao P01 + A01 kề nhau ngoài cùng mép Cạnh C',
+        ],
+        cons: ['Cần điều chỉnh linh hoạt theo kích thước thực tế'],
       },
     ];
 

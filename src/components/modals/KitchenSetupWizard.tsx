@@ -17,7 +17,18 @@ import {
   ArrowRight,
   Ruler,
   X,
+  Search,
 } from 'lucide-react';
+
+function removeVietnameseTones(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+}
 
 interface KitchenSetupWizardProps {
   isOpen: boolean;
@@ -54,7 +65,7 @@ const INITIAL_SHAPE_PRESETS: Record<KitchenShape, ShapePreset> = {
     selectedCodes: ['F01', 'S01', 'B01', 'D01', 'C01', 'SP01', 'K01'],
   },
   U: {
-    lengthA: 2700,
+    lengthA: 3400,
     depthA: 600,
     lengthB: 2400,
     depthB: 600,
@@ -76,6 +87,7 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
 
   const [shape, setShape] = useState<KitchenShape>(layout.shape || 'I');
   const [shapePresets, setShapePresets] = useState<Record<KitchenShape, ShapePreset>>(INITIAL_SHAPE_PRESETS);
+  const [wizardSearchTerm, setWizardSearchTerm] = useState('');
 
   // Kích thước cạnh & danh sách khoang của kiểu bếp đang chọn
   const currentPreset = shapePresets[shape];
@@ -108,6 +120,19 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
 
   // Lọc chỉ lấy các khoang tủ dưới từ catalog
   const baseCatalogModules = catalog.filter((m) => m.tier !== 'upper');
+
+  const displayedBaseModules = baseCatalogModules.filter((mod) => {
+    if (!wizardSearchTerm) return true;
+    const searchClean = removeVietnameseTones(wizardSearchTerm);
+    const nameClean = removeVietnameseTones(mod.name);
+    const codeClean = mod.code.toLowerCase();
+    const descClean = removeVietnameseTones(mod.description || '');
+    return (
+      nameClean.includes(searchClean) ||
+      codeClean.includes(wizardSearchTerm.toLowerCase().trim()) ||
+      descClean.includes(searchClean)
+    );
+  });
 
   const handleShapeChange = (newShape: KitchenShape) => {
     setShape(newShape);
@@ -462,61 +487,89 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {baseCatalogModules.map((mod) => {
-                const isCornerDisabled =
-                  shape === 'I' && (mod.code === 'K01' || mod.category === 'corner');
-                const isSelected = !isCornerDisabled && selectedBaseCodes.includes(mod.code);
-                const isRequired = ['F01', 'S01', 'B01'].includes(mod.code);
+            {/* Ô tìm kiếm khoang nhanh trong Wizard */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Tìm nhanh khoang công năng (vd: tủ lạnh, chậu, bếp, F01, D01, dao thớt...)..."
+                value={wizardSearchTerm}
+                onChange={(e) => setWizardSearchTerm(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 shadow-inner"
+              />
+              {wizardSearchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setWizardSearchTerm('')}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
+                  title="Xóa tìm kiếm"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
 
-                return (
-                  <div
-                    key={mod.id}
-                    onClick={() => {
-                      if (!isCornerDisabled) toggleCode(mod.code);
-                    }}
-                    className={`p-2.5 rounded-xl border transition flex items-start gap-2.5 ${
-                      isCornerDisabled
-                        ? 'opacity-40 bg-slate-950/20 border-slate-900 cursor-not-allowed'
-                        : isSelected
-                        ? 'bg-sky-500/10 border-sky-500/50 text-slate-100 shadow-sm cursor-pointer'
-                        : 'bg-slate-950/40 border-slate-800/80 text-slate-400 hover:border-slate-700 cursor-pointer'
-                    }`}
-                  >
-                    <div className="mt-0.5 shrink-0">
-                      {isCornerDisabled ? (
-                        <Square className="w-4 h-4 text-slate-700" />
-                      ) : isSelected ? (
-                        <CheckSquare2 className="w-4 h-4 text-sky-400" />
-                      ) : (
-                        <Square className="w-4 h-4 text-slate-600" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                        <span className="font-mono font-bold text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-sky-300">
-                          {mod.code}
-                        </span>
-                        {isRequired && (
-                          <span className="text-[9px] font-bold text-rose-400 bg-rose-500/10 px-1 rounded">
-                            Bắt buộc
-                          </span>
-                        )}
-                        {isCornerDisabled && (
-                          <span className="text-[9px] font-semibold text-amber-400/80 bg-amber-500/10 px-1 rounded border border-amber-500/20">
-                            Chỉ bếp L/U
-                          </span>
+            {displayedBaseModules.length === 0 ? (
+              <div className="text-center py-6 px-3 bg-slate-950/40 rounded-xl border border-dashed border-slate-800 text-slate-500 text-xs">
+                Không tìm thấy khoang nào phù hợp với từ khóa &ldquo;{wizardSearchTerm}&rdquo;.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {displayedBaseModules.map((mod) => {
+                  const isCornerDisabled =
+                    shape === 'I' && (mod.code === 'K01' || mod.category === 'corner');
+                  const isSelected = !isCornerDisabled && selectedBaseCodes.includes(mod.code);
+                  const isRequired = ['F01', 'S01', 'B01'].includes(mod.code);
+
+                  return (
+                    <div
+                      key={mod.id}
+                      onClick={() => {
+                        if (!isCornerDisabled) toggleCode(mod.code);
+                      }}
+                      className={`p-2.5 rounded-xl border transition flex items-start gap-2.5 ${
+                        isCornerDisabled
+                          ? 'opacity-40 bg-slate-950/20 border-slate-900 cursor-not-allowed'
+                          : isSelected
+                          ? 'bg-sky-500/10 border-sky-500/50 text-slate-100 shadow-sm cursor-pointer'
+                          : 'bg-slate-950/40 border-slate-800/80 text-slate-400 hover:border-slate-700 cursor-pointer'
+                      }`}
+                    >
+                      <div className="mt-0.5 shrink-0">
+                        {isCornerDisabled ? (
+                          <Square className="w-4 h-4 text-slate-700" />
+                        ) : isSelected ? (
+                          <CheckSquare2 className="w-4 h-4 text-sky-400" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-600" />
                         )}
                       </div>
-                      <h5 className="font-bold text-xs truncate">{mod.name}</h5>
-                      <span className="text-[10px] text-slate-500">
-                        {mod.variants.map((v) => v.width).join(', ')}mm
-                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                          <span className="font-mono font-bold text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-sky-300">
+                            {mod.code}
+                          </span>
+                          {isRequired && (
+                            <span className="text-[9px] font-bold text-rose-400 bg-rose-500/10 px-1 rounded">
+                              Bắt buộc
+                            </span>
+                          )}
+                          {isCornerDisabled && (
+                            <span className="text-[9px] font-semibold text-amber-400/80 bg-amber-500/10 px-1 rounded border border-amber-500/20">
+                              Chỉ bếp L/U
+                            </span>
+                          )}
+                        </div>
+                        <h5 className="font-bold text-xs truncate">{mod.name}</h5>
+                        <span className="text-[10px] text-slate-500">
+                          {mod.variants.map((v) => v.width).join(', ')}mm
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 

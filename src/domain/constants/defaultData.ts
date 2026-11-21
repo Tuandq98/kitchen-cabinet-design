@@ -51,10 +51,15 @@ export const DEFAULT_MODULES: KitchenModule[] = [
     category: 'refrigeration',
     description: 'Khoang tủ lạnh đứng (Side-by-side hoặc 2 cánh) kèm tủ bao nóc',
     color: '#3b82f6', // Blue-500
+    minWidth: 600,
+    maxWidth: 1000,
     variants: [
       { id: 'var-f01-900', width: 900, depth: 650, height: 1800, isDefault: true },
+      { id: 'var-f01-600', width: 600, depth: 650, height: 1800 },
+      { id: 'var-f01-700', width: 700, depth: 650, height: 1800 },
       { id: 'var-f01-750', width: 750, depth: 650, height: 1800 },
       { id: 'var-f01-800', width: 800, depth: 650, height: 1800 },
+      { id: 'var-f01-850', width: 850, depth: 650, height: 1800 },
       { id: 'var-f01-1000', width: 1000, depth: 700, height: 1800 },
     ],
     metadata: {

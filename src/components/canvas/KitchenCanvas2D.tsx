@@ -100,18 +100,18 @@ export const KitchenCanvas2D: React.FC = () => {
   };
 
   const handleReorder = (sourceId: string, targetId: string) => {
-    // 1. Kiểm tra nếu cùng là khoang Tủ Dưới
+    // 1. Kiểm tra nếu là khoang Tủ Dưới (cho phép hoán đổi cả cùng cạnh lẫn khác cạnh)
     const sourceBase = layout.placedModules.find((m) => m.instanceId === sourceId);
     const targetBase = layout.placedModules.find((m) => m.instanceId === targetId);
-    if (sourceBase && targetBase && sourceBase.edgeId === targetBase.edgeId) {
+    if (sourceBase && targetBase) {
       moveModule(sourceId, targetBase.edgeId, targetBase.positionIndex);
       return;
     }
 
-    // 2. Kiểm tra nếu cùng là khoang Tủ Trên
+    // 2. Kiểm tra nếu là khoang Tủ Trên
     const sourceUpper = (layout.placedUpperModules || []).find((m) => m.instanceId === sourceId);
     const targetUpper = (layout.placedUpperModules || []).find((m) => m.instanceId === targetId);
-    if (sourceUpper && targetUpper && sourceUpper.edgeId === targetUpper.edgeId) {
+    if (sourceUpper && targetUpper) {
       moveModule(sourceId, targetUpper.edgeId, targetUpper.positionIndex);
       return;
     }
@@ -125,7 +125,46 @@ export const KitchenCanvas2D: React.FC = () => {
     const dropX = (e.clientX - rect.left - pan.x) / zoom;
     const dropY = (e.clientY - rect.top - pan.y) / zoom;
 
-    // 1. Di chuyển / Kéo thả khoang đã đặt trên Canvas vào vị trí mới
+    const rootOffsetX = Math.max(80, -layout2D.minX + 80);
+    const rootOffsetY = 100;
+    const modelX = dropX - rootOffsetX;
+    const modelY = dropY - rootOffsetY;
+
+    const baseRowY = activeCabinetTier === 'all' ? (layout.upperDepth || 350) + 150 : 0;
+    const lengthA = layout.edgeA.length;
+    const depthA = layout.edgeA.depth || 600;
+    const depthB = layout.edgeB?.depth || 600;
+    const depthC = layout.edgeC?.depth || 600;
+
+    // Xác định cạnh mục tiêu (targetEdge) chuẩn xác theo tọa độ không gian 2D
+    let targetEdge: 'edge_A' | 'edge_B' | 'edge_C' = 'edge_A';
+    if (layout.shape === 'L') {
+      if (modelX < depthB + 300 && modelY > baseRowY + 150) {
+        targetEdge = 'edge_B';
+      } else {
+        targetEdge = 'edge_A';
+      }
+    } else if (layout.shape === 'U') {
+      if (modelX < depthB + 300 && modelY > baseRowY + 150) {
+        targetEdge = 'edge_B';
+      } else if (modelX > lengthA - depthC - 300 && modelY > baseRowY + 150) {
+        targetEdge = 'edge_C';
+      } else if (modelY > baseRowY + depthA + 100) {
+        // Rơi vào vùng bên dưới khoảng mở chữ U
+        targetEdge = modelX < lengthA / 2 ? 'edge_B' : 'edge_C';
+      } else {
+        // Vùng ngang cạnh A
+        if (modelX < depthB) {
+          targetEdge = 'edge_B';
+        } else if (modelX > lengthA - depthC) {
+          targetEdge = 'edge_C';
+        } else {
+          targetEdge = 'edge_A';
+        }
+      }
+    }
+
+    // 1. Di chuyển / Kéo thả khoang đã đặt trên Canvas vào vị trí mới (hỗ trợ chuyển cạnh)
     const draggedInstanceId = e.dataTransfer.getData('application/kitchen-placed-instance');
     if (draggedInstanceId) {
       const placedUpper = (layout.placedUpperModules || []).find((m) => m.instanceId === draggedInstanceId);
@@ -133,35 +172,57 @@ export const KitchenCanvas2D: React.FC = () => {
 
       if (placedUpper) {
         const edgeUpper = (layout.placedUpperModules || [])
-          .filter((m) => m.edgeId === placedUpper.edgeId)
+          .filter((m) => m.edgeId === targetEdge && m.instanceId !== draggedInstanceId)
           .sort((a, b) => a.positionIndex - b.positionIndex);
 
-        let targetIndex = edgeUpper.length - 1;
-        for (let i = 0; i < edgeUpper.length; i++) {
-          const m = edgeUpper[i];
-          if (dropX < m.offset + m.width / 2) {
-            targetIndex = i;
-            break;
+        let targetIndex = edgeUpper.length;
+        if (targetEdge === 'edge_A') {
+          for (let i = 0; i < edgeUpper.length; i++) {
+            const m = edgeUpper[i];
+            if (modelX < m.offset + m.width / 2) {
+              targetIndex = i;
+              break;
+            }
+          }
+        } else {
+          for (let i = 0; i < edgeUpper.length; i++) {
+            const m = edgeUpper[i];
+            const modMidY = m.offset + m.width / 2;
+            if (modelY < modMidY) {
+              targetIndex = i;
+              break;
+            }
           }
         }
-        moveModule(draggedInstanceId, placedUpper.edgeId, Math.max(0, targetIndex));
+        moveModule(draggedInstanceId, targetEdge, Math.max(0, targetIndex));
         return;
       }
 
       if (placedBase) {
         const edgeBase = layout.placedModules
-          .filter((m) => m.edgeId === placedBase.edgeId)
+          .filter((m) => m.edgeId === targetEdge && m.instanceId !== draggedInstanceId)
           .sort((a, b) => a.positionIndex - b.positionIndex);
 
-        let targetIndex = edgeBase.length - 1;
-        for (let i = 0; i < edgeBase.length; i++) {
-          const m = edgeBase[i];
-          if (dropX < m.offset + m.width / 2) {
-            targetIndex = i;
-            break;
+        let targetIndex = edgeBase.length;
+        if (targetEdge === 'edge_A') {
+          for (let i = 0; i < edgeBase.length; i++) {
+            const m = edgeBase[i];
+            if (modelX < m.offset + m.width / 2) {
+              targetIndex = i;
+              break;
+            }
+          }
+        } else {
+          for (let i = 0; i < edgeBase.length; i++) {
+            const m = edgeBase[i];
+            const modMidY = baseRowY + m.offset + m.width / 2;
+            if (modelY < modMidY) {
+              targetIndex = i;
+              break;
+            }
           }
         }
-        moveModule(draggedInstanceId, placedBase.edgeId, Math.max(0, targetIndex));
+        moveModule(draggedInstanceId, targetEdge, Math.max(0, targetIndex));
         return;
       }
     }
@@ -169,20 +230,6 @@ export const KitchenCanvas2D: React.FC = () => {
     // 2. Thả khoang mới từ Catalog vào Canvas
     const moduleId = e.dataTransfer.getData('application/kitchen-module');
     if (!moduleId) return;
-
-    // Với bếp L hoặc U: nếu dropY > 600 và dropX < 800 thì là Cạnh B
-    let targetEdge: 'edge_A' | 'edge_B' | 'edge_C' = 'edge_A';
-    if (layout.shape === 'L') {
-      if (dropY > 600 && dropX < 800) {
-        targetEdge = 'edge_B';
-      }
-    } else if (layout.shape === 'U') {
-      if (dropY > 600 && dropX < 800) {
-        targetEdge = 'edge_B';
-      } else if (dropY > 600 && dropX > layout.edgeA.length - 800) {
-        targetEdge = 'edge_C';
-      }
-    }
 
     addModuleToEdge(moduleId, targetEdge);
   };

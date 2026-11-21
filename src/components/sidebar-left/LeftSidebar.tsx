@@ -24,7 +24,18 @@ import {
   ArrowRight,
   Download,
   Upload,
+  X,
 } from 'lucide-react';
+
+function removeVietnameseTones(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+}
 
 interface LeftSidebarProps {
   onOpenCatalogModal: () => void;
@@ -80,11 +91,19 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     }
   };
 
-  // Lọc catalog
+  // Lọc catalog (hỗ trợ tìm kiếm tiếng Việt không dấu và có dấu, mã khoang, mô tả)
   const filteredCatalog = catalog.filter((mod) => {
+    const searchClean = removeVietnameseTones(searchTerm);
+    const nameClean = removeVietnameseTones(mod.name);
+    const codeClean = mod.code.toLowerCase();
+    const descClean = removeVietnameseTones(mod.description || '');
+
     const matchesSearch =
-      mod.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      mod.code.toLowerCase().includes(searchTerm.toLowerCase());
+      !searchTerm ||
+      nameClean.includes(searchClean) ||
+      codeClean.includes(searchTerm.toLowerCase().trim()) ||
+      descClean.includes(searchClean);
+
     const matchesCat =
       selectedCategory === 'all' || mod.category === selectedCategory;
     const matchesTier =
@@ -158,11 +177,21 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
               <input
                 type="text"
-                placeholder="Tìm tên hoặc mã khoang..."
+                placeholder="Tìm nhanh tên hoặc mã khoang..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                className="w-full bg-slate-950 border border-slate-700/80 rounded-lg pl-9 pr-8 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 shadow-inner"
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+                  title="Xóa tìm kiếm"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
             {/* Tier Filter Toggle (Tất cả / Tủ Dưới / Tủ Trên) */}

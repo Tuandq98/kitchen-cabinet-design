@@ -634,6 +634,296 @@ export function getBaseModuleSpaceInfo(
   };
 }
 
+/**
+ * Phân bổ công năng công thái học chuẩn NKBA & Tam giác công năng cho các cạnh khi generator không có candidate
+ * Tuyệt đối không dồn toàn bộ khoang vào Cạnh A khi làm bếp chữ L hoặc chữ U.
+ */
+function createErgonomicFallbackModules(
+  shape: KitchenShape,
+  edgeA: { length: number; depth: number },
+  edgeB?: { length: number; depth: number },
+  edgeC?: { length: number; depth: number },
+  baseCodes: string[] = [],
+  catalog: KitchenModule[] = [],
+  orientAB: 'edge_A' | 'edge_B' = 'edge_A',
+  orientAC: 'edge_A' | 'edge_C' = 'edge_C',
+  wBaseAB = 1000,
+  wBaseAC = 1000
+): PlacedModuleInstance[] {
+  const depthA = edgeA.depth || 600;
+  const depthB = edgeB?.depth || 600;
+  const depthC = edgeC?.depth || 600;
+
+  const codesToPlace = baseCodes.filter((c) => c !== 'K01' && c !== 'UK01');
+  const placed: PlacedModuleInstance[] = [];
+
+  const getModAndVariant = (code: string) => {
+    const mod = catalog.find((m) => m.code === code);
+    if (!mod) return null;
+    const v = mod.variants.find((v) => v.isDefault) || mod.variants[0];
+    return { mod, variant: v };
+  };
+
+  if (shape === 'U') {
+    const hasD01 = codesToPlace.includes('D01');
+    const takesAB_on_A = orientAB === 'edge_A' ? wBaseAB : depthB;
+    const takesAC_on_A = orientAC === 'edge_A' ? wBaseAC : depthC;
+    const availA = edgeA.length - takesAB_on_A - takesAC_on_A;
+
+    const needAWithoutD01 = 1200; // S01 (~850) + C01 (~350)
+    const canFitD01OnA = hasD01 && availA >= needAWithoutD01 + 600;
+
+    const bCodes: string[] = [];
+    const aCodes: string[] = [];
+    const cCodes: string[] = [];
+
+    for (const code of codesToPlace) {
+      if (code === 'F01') {
+        bCodes.push(code); // Tủ lạnh ở Cạnh B (rìa ngoài)
+      } else if (code === 'D01') {
+        if (canFitD01OnA) {
+          aCodes.push(code);
+        } else {
+          bCodes.unshift(code); // D01 ở Cạnh B kề góc chậu
+        }
+      } else if (code === 'S01' || code === 'C01' || code === 'W01') {
+        aCodes.push(code); // Chậu & Sơ chế ở Cạnh A
+      } else if (
+        code === 'B01' ||
+        code === 'SP01' ||
+        code === 'R01' ||
+        code === 'M01' ||
+        code === 'P01' ||
+        code === 'A01'
+      ) {
+        cCodes.push(code); // Bếp & Tủ cao ở Cạnh C
+      } else {
+        if (bCodes.length <= 1) {
+          bCodes.unshift(code);
+        } else if (aCodes.length <= 2) {
+          aCodes.push(code);
+        } else {
+          cCodes.push(code);
+        }
+      }
+    }
+
+    // Thứ tự Cạnh B: từ góc AB xuống ngoài cùng -> F01 ở ngoài cùng mép B (RULE_08)
+    bCodes.sort((a, b) => {
+      if (a === 'F01') return 1;
+      if (b === 'F01') return -1;
+      return 0;
+    });
+
+    // Thứ tự Cạnh A: từ trái sang phải -> [C01, S01, W01, D01]
+    const orderA: Record<string, number> = { C01: 1, S01: 2, W01: 3, D01: 4, T01: 5 };
+    aCodes.sort((a, b) => (orderA[a] ?? 99) - (orderA[b] ?? 99));
+
+    // Thứ tự Cạnh C: từ góc AC xuống ngoài cùng -> [B01, SP01, R01, M01, T01, P01, A01] (P01, A01 ngoài cùng mép C kề nhau, RULE_08 & RULE_09)
+    const orderC: Record<string, number> = {
+      B01: 1,
+      SP01: 2,
+      R01: 3,
+      M01: 4,
+      T01: 5,
+      P01: 10,
+      A01: 11,
+    };
+    cCodes.sort((a, b) => (orderC[a] ?? 99) - (orderC[b] ?? 99));
+
+    let curB = orientAB === 'edge_B' ? wBaseAB : depthA;
+    bCodes.forEach((code, idx) => {
+      const item = getModAndVariant(code);
+      if (!item) return;
+      placed.push({
+        instanceId: `base-${code}-B-${idx}`,
+        moduleId: item.mod.id,
+        variantId: item.variant.id,
+        code: item.mod.code,
+        name: item.mod.name,
+        category: item.mod.category,
+        tier: 'base',
+        edgeId: 'edge_B',
+        positionIndex: idx,
+        offset: curB,
+        width: item.variant.width,
+        depth: item.variant.depth,
+        height: item.variant.height,
+        color: item.mod.color,
+      });
+      curB += item.variant.width;
+    });
+
+    let curA = orientAB === 'edge_A' ? wBaseAB : depthB;
+    aCodes.forEach((code, idx) => {
+      const item = getModAndVariant(code);
+      if (!item) return;
+      placed.push({
+        instanceId: `base-${code}-A-${idx}`,
+        moduleId: item.mod.id,
+        variantId: item.variant.id,
+        code: item.mod.code,
+        name: item.mod.name,
+        category: item.mod.category,
+        tier: 'base',
+        edgeId: 'edge_A',
+        positionIndex: idx,
+        offset: curA,
+        width: item.variant.width,
+        depth: item.variant.depth,
+        height: item.variant.height,
+        color: item.mod.color,
+      });
+      curA += item.variant.width;
+    });
+
+    let curC = orientAC === 'edge_C' ? wBaseAC : depthA;
+    cCodes.forEach((code, idx) => {
+      const item = getModAndVariant(code);
+      if (!item) return;
+      placed.push({
+        instanceId: `base-${code}-C-${idx}`,
+        moduleId: item.mod.id,
+        variantId: item.variant.id,
+        code: item.mod.code,
+        name: item.mod.name,
+        category: item.mod.category,
+        tier: 'base',
+        edgeId: 'edge_C',
+        positionIndex: idx,
+        offset: curC,
+        width: item.variant.width,
+        depth: item.variant.depth,
+        height: item.variant.height,
+        color: item.mod.color,
+      });
+      curC += item.variant.width;
+    });
+
+    return placed;
+  }
+
+  if (shape === 'L') {
+    const bCodes: string[] = [];
+    const aCodes: string[] = [];
+
+    for (const code of codesToPlace) {
+      if (code === 'F01') {
+        bCodes.push(code);
+      } else {
+        aCodes.push(code);
+      }
+    }
+
+    const orderA: Record<string, number> = {
+      C01: 1,
+      S01: 2,
+      W01: 3,
+      D01: 4,
+      T01: 5,
+      B01: 6,
+      SP01: 7,
+      R01: 8,
+      M01: 9,
+      P01: 10,
+      A01: 11,
+    };
+    aCodes.sort((a, b) => (orderA[a] ?? 99) - (orderA[b] ?? 99));
+
+    let curB = orientAB === 'edge_B' ? wBaseAB : depthA;
+    bCodes.forEach((code, idx) => {
+      const item = getModAndVariant(code);
+      if (!item) return;
+      placed.push({
+        instanceId: `base-${code}-B-${idx}`,
+        moduleId: item.mod.id,
+        variantId: item.variant.id,
+        code: item.mod.code,
+        name: item.mod.name,
+        category: item.mod.category,
+        tier: 'base',
+        edgeId: 'edge_B',
+        positionIndex: idx,
+        offset: curB,
+        width: item.variant.width,
+        depth: item.variant.depth,
+        height: item.variant.height,
+        color: item.mod.color,
+      });
+      curB += item.variant.width;
+    });
+
+    let curA = orientAB === 'edge_A' ? wBaseAB : depthB;
+    aCodes.forEach((code, idx) => {
+      const item = getModAndVariant(code);
+      if (!item) return;
+      placed.push({
+        instanceId: `base-${code}-A-${idx}`,
+        moduleId: item.mod.id,
+        variantId: item.variant.id,
+        code: item.mod.code,
+        name: item.mod.name,
+        category: item.mod.category,
+        tier: 'base',
+        edgeId: 'edge_A',
+        positionIndex: idx,
+        offset: curA,
+        width: item.variant.width,
+        depth: item.variant.depth,
+        height: item.variant.height,
+        color: item.mod.color,
+      });
+      curA += item.variant.width;
+    });
+
+    return placed;
+  }
+
+  // Chữ I:
+  const orderI: Record<string, number> = {
+    F01: 10,
+    C01: 30,
+    W01: 40,
+    S01: 50,
+    D01: 60,
+    R01: 70,
+    B01: 80,
+    SP01: 90,
+    M01: 100,
+    T01: 110,
+    P01: 120,
+    A01: 130,
+  };
+  const sortedCodes = [...codesToPlace].sort(
+    (a, b) => (orderI[a] ?? 999) - (orderI[b] ?? 999)
+  );
+
+  let curA = 0;
+  sortedCodes.forEach((code, idx) => {
+    const item = getModAndVariant(code);
+    if (!item) return;
+    placed.push({
+      instanceId: `base-${code}-${idx}`,
+      moduleId: item.mod.id,
+      variantId: item.variant.id,
+      code: item.mod.code,
+      name: item.mod.name,
+      category: item.mod.category,
+      tier: 'base',
+      edgeId: 'edge_A',
+      positionIndex: idx,
+      offset: curA,
+      width: item.variant.width,
+      depth: item.variant.depth,
+      height: item.variant.height,
+      color: item.mod.color,
+    });
+    curA += item.variant.width;
+  });
+
+  return placed;
+}
+
 // Helper to push history state
 function pushHistory(
   state: KitchenStoreState,
@@ -858,51 +1148,19 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
       if (initialCandidateLayout) {
         placedModules = initialCandidateLayout.placedModules;
       } else {
-        // Fallback: Sắp xếp tuần tự các khoang đã chọn theo chuẩn công thái học để luôn tạo được bếp
-        // Tủ lạnh (F01) ở ngoài cùng mép trái, khoang bàn bếp ở giữa, khối tủ cao P01 + A01 ở ngoài cùng mép phải
-        const orderRank: Record<string, number> = {
-          F01: 10,
-          C01: 30,
-          W01: 40,
-          S01: 50,
-          D01: 60,
-          R01: 70,
-          B01: 80,
-          SP01: 90,
-          M01: 100,
-          T01: 110,
-          P01: 120,
-          A01: 130,
-        };
-
-        const sortedCodes = [...baseCodes].sort(
-          (a, b) => (orderRank[a] ?? 999) - (orderRank[b] ?? 999)
+        // Fallback: Phân bổ công năng công thái học chuẩn NKBA & Tam giác công năng cho các cạnh
+        placedModules = createErgonomicFallbackModules(
+          shape,
+          newEdgeA,
+          newEdgeB,
+          newEdgeC,
+          baseCodes,
+          state.catalog,
+          newEdgeA.length >= (newEdgeB?.length || 0) ? 'edge_A' : 'edge_B',
+          'edge_C',
+          1000,
+          1000
         );
-
-        let curOffset = 0;
-        let pIdx = 0;
-        for (const code of sortedCodes) {
-          const mod = state.catalog.find((m) => m.code === code);
-          if (!mod) continue;
-          const v = mod.variants.find((v) => v.isDefault) || mod.variants[0];
-          placedModules.push({
-            instanceId: `base-${code}-${pIdx}`,
-            moduleId: mod.id,
-            variantId: v.id,
-            code: mod.code,
-            name: mod.name,
-            category: mod.category,
-            tier: 'base',
-            edgeId: 'edge_A',
-            positionIndex: pIdx++,
-            offset: curOffset,
-            width: v.width,
-            depth: v.depth,
-            height: v.height,
-            color: mod.color,
-          });
-          curOffset += v.width;
-        }
       }
 
       const newLayout: KitchenLayout = {
@@ -1048,44 +1306,60 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
       if (updatedShapeLayouts[newShape]) {
         let targetLayout = updatedShapeLayouts[newShape]!;
         // Khoang góc nối chỉ được sinh ra khi làm bếp chữ L và chữ U. Bếp chữ I loại bỏ K01 và UK01.
-        if (newShape === 'I') {
-          targetLayout = {
-            ...targetLayout,
-            placedModules: targetLayout.placedModules.filter(
-              (m) => m.code !== 'K01' && m.code !== 'UK01' && m.category !== 'corner'
-            ),
-            placedUpperModules: (targetLayout.placedUpperModules || []).filter(
-              (m) => m.code !== 'K01' && m.code !== 'UK01' && m.category !== 'corner'
-            ),
-            selectedModuleCodes: (targetLayout.selectedModuleCodes || []).filter(
-              (c) => c !== 'K01' && c !== 'UK01'
-            ),
-          };
-        }
-        const rep = ruleEngineInstance.evaluate(targetLayout, state.catalog, targetLayout.designPhase);
-        const targetCodes =
-          targetLayout.selectedModuleCodes && targetLayout.selectedModuleCodes.length > 0
-            ? targetLayout.selectedModuleCodes
-            : Array.from(new Set(targetLayout.placedModules.map((m) => m.code)));
-        const finalTargetCodes = newShape === 'I' ? targetCodes.filter((c) => c !== 'K01') : targetCodes;
+        // Kiểm tra nếu bản vẽ đã lưu của Bếp chữ U bị lỗi dồn hết vào Cạnh A thì tạo mới lại
+        const isBrokenU =
+          newShape === 'U' &&
+          targetLayout.placedModules.length > 0 &&
+          targetLayout.placedModules.every((m) => m.edgeId === 'edge_A');
 
-        set({
-          ...pushHistory(state, targetLayout),
-          shapeLayouts: updatedShapeLayouts,
-          designPhase: targetLayout.designPhase || 'design_base',
-          activeCabinetTier: 'all',
-          validationReport: rep,
-          selectedModuleCodes: finalTargetCodes,
-        });
-        return;
+        if (!isBrokenU) {
+          if (newShape === 'I') {
+            targetLayout = {
+              ...targetLayout,
+              placedModules: targetLayout.placedModules.filter(
+                (m) => m.code !== 'K01' && m.code !== 'UK01' && m.category !== 'corner'
+              ),
+              placedUpperModules: (targetLayout.placedUpperModules || []).filter(
+                (m) => m.code !== 'K01' && m.code !== 'UK01' && m.category !== 'corner'
+              ),
+              selectedModuleCodes: (targetLayout.selectedModuleCodes || []).filter(
+                (c) => c !== 'K01' && c !== 'UK01'
+              ),
+            };
+          }
+          const rep = ruleEngineInstance.evaluate(targetLayout, state.catalog, targetLayout.designPhase);
+          const targetCodes =
+            targetLayout.selectedModuleCodes && targetLayout.selectedModuleCodes.length > 0
+              ? targetLayout.selectedModuleCodes
+              : Array.from(new Set(targetLayout.placedModules.map((m) => m.code)));
+          const finalTargetCodes = newShape === 'I' ? targetCodes.filter((c) => c !== 'K01') : targetCodes;
+
+          set({
+            ...pushHistory(state, targetLayout),
+            shapeLayouts: updatedShapeLayouts,
+            designPhase: targetLayout.designPhase || 'design_base',
+            activeCabinetTier: 'all',
+            validationReport: rep,
+            selectedModuleCodes: finalTargetCodes,
+          });
+          return;
+        }
       }
 
-      // 3. Nếu chưa có bản vẽ cho newShape, khởi tạo độc lập hoàn toàn (không kế thừa dữ liệu từ kiểu bếp trước)
+      // 3. Nếu chưa có bản vẽ cho newShape (hoặc bản vẽ cũ bị lỗi), khởi tạo độc lập hoàn toàn
       const layoutEngine = new LayoutEngine(state.rules);
+      // Kế thừa các khoang đang dùng từ layout hiện tại (ví dụ P01, A01...) để không bị mất khi chuyển kiểu bếp
+      const currentCodes = state.layout.placedModules
+        .map((m) => m.code)
+        .filter((c) => c !== 'K01' && c !== 'UK01');
       const baseCodes =
-        newShape === 'I'
-          ? ['F01', 'S01', 'B01', 'D01', 'C01', 'SP01']
-          : ['F01', 'S01', 'B01', 'D01', 'C01', 'SP01', 'K01'];
+        currentCodes.length > 0
+          ? Array.from(new Set(currentCodes))
+          : ['F01', 'S01', 'B01', 'D01', 'C01', 'SP01'];
+
+      if (newShape !== 'I' && !baseCodes.includes('K01')) {
+        baseCodes.push('K01');
+      }
 
       let edgeA = { id: 'edge_A' as EdgeId, name: 'Cạnh A', length: 3600, depth: 600, height: 850 };
       let edgeB: { id: EdgeId; name: string; length: number; depth: number; height: number; angle?: number } | undefined = undefined;
@@ -1095,7 +1369,7 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
         edgeA = { id: 'edge_A' as EdgeId, name: 'Cạnh A', length: 3000, depth: 600, height: 850 };
         edgeB = { id: 'edge_B' as EdgeId, name: 'Cạnh B', length: 2400, depth: 600, height: 850, angle: 90 };
       } else if (newShape === 'U') {
-        edgeA = { id: 'edge_A' as EdgeId, name: 'Cạnh A', length: 2700, depth: 600, height: 850 };
+        edgeA = { id: 'edge_A' as EdgeId, name: 'Cạnh A', length: 3400, depth: 600, height: 850 };
         edgeB = { id: 'edge_B' as EdgeId, name: 'Cạnh B', length: 2400, depth: 600, height: 850, angle: 90 };
         edgeC = { id: 'edge_C' as EdgeId, name: 'Cạnh C', length: 2400, depth: 600, height: 850, angle: 90 };
       }
@@ -1115,51 +1389,19 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
       if (initialCandidateLayout) {
         placedModules = initialCandidateLayout.placedModules;
       } else {
-        // Fallback: Sắp xếp tuần tự các khoang đã chọn theo chuẩn công thái học để luôn tạo được bếp
-        // Tủ lạnh (F01) ở ngoài cùng mép trái, khoang bàn bếp ở giữa, khối tủ cao P01 + A01 ở ngoài cùng mép phải
-        const orderRank: Record<string, number> = {
-          F01: 10,
-          C01: 30,
-          W01: 40,
-          S01: 50,
-          D01: 60,
-          R01: 70,
-          B01: 80,
-          SP01: 90,
-          M01: 100,
-          T01: 110,
-          P01: 120,
-          A01: 130,
-        };
-
-        const sortedCodes = [...baseCodes].sort(
-          (a, b) => (orderRank[a] ?? 999) - (orderRank[b] ?? 999)
+        // Fallback: Phân bổ công năng công thái học chuẩn NKBA & Tam giác công năng cho các cạnh
+        placedModules = createErgonomicFallbackModules(
+          newShape,
+          edgeA,
+          edgeB,
+          edgeC,
+          baseCodes,
+          state.catalog,
+          edgeA.length >= (edgeB?.length || 0) ? 'edge_A' : 'edge_B',
+          'edge_C',
+          1000,
+          1000
         );
-
-        let curOffset = 0;
-        let pIdx = 0;
-        for (const code of sortedCodes) {
-          const mod = state.catalog.find((m) => m.code === code);
-          if (!mod) continue;
-          const v = mod.variants.find((v) => v.isDefault) || mod.variants[0];
-          placedModules.push({
-            instanceId: `base-${code}-${pIdx}`,
-            moduleId: mod.id,
-            variantId: v.id,
-            code: mod.code,
-            name: mod.name,
-            category: mod.category,
-            tier: 'base',
-            edgeId: 'edge_A',
-            positionIndex: pIdx++,
-            offset: curOffset,
-            width: v.width,
-            depth: v.depth,
-            height: v.height,
-            color: mod.color,
-          });
-          curOffset += v.width;
-        }
       }
 
       const newLayout: KitchenLayout = {
@@ -1661,6 +1903,8 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
           validWidth = Math.max(830, Math.min(900, validWidth));
         } else if (targetBase.code === 'K01') {
           validWidth = Math.max(980, Math.min(1030, validWidth));
+        } else if (targetBase.code === 'F01') {
+          validWidth = Math.max(600, Math.min(1000, validWidth));
         } else if (targetBase.code === 'T01') {
           const spaceInfo = getBaseModuleSpaceInfo(instanceId, state.layout);
           validWidth = Math.max(300, Math.min(spaceInfo.maxAllowedWidth, validWidth));

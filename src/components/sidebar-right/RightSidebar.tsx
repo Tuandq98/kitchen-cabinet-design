@@ -533,6 +533,113 @@ export const RightSidebar: React.FC = () => {
               </div>
             )}
 
+            {/* Khoang tủ lạnh (F01): Tùy chỉnh linh hoạt từ 600mm đến 1000mm (Mặc định 900mm) */}
+            {selectedModule.code === 'F01' && (
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Chiều rộng khoang tủ lạnh:</span>
+                  </label>
+                  <span className="text-[10px] text-blue-400 font-mono font-bold">
+                    600mm - 1000mm (Chuẩn 900mm)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={selectedModule.width <= 600}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.max(600, selectedModule.width - 50)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Giảm 50mm"
+                  >
+                    -50
+                  </button>
+                  <button
+                    disabled={selectedModule.width <= 600}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.max(600, selectedModule.width - 10)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Giảm 10mm"
+                  >
+                    -10
+                  </button>
+                  <div className="relative flex-1">
+                    <input
+                      type="number"
+                      min={600}
+                      max={1000}
+                      step={10}
+                      value={selectedModule.width}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (!isNaN(val) && val >= 600 && val <= 1000) {
+                          updatePlacedModuleCustomWidth(selectedModule.instanceId, val);
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono font-bold text-blue-400 focus:outline-none focus:border-blue-500"
+                    />
+                    <span className="absolute right-2 top-1.5 text-[10px] text-slate-500 pointer-events-none">
+                      mm
+                    </span>
+                  </div>
+                  <button
+                    disabled={selectedModule.width >= 1000}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.min(1000, selectedModule.width + 10)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Tăng 10mm"
+                  >
+                    +10
+                  </button>
+                  <button
+                    disabled={selectedModule.width >= 1000}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.min(1000, selectedModule.width + 50)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Tăng 50mm"
+                  >
+                    +50
+                  </button>
+                </div>
+
+                {/* Preset kích thước tủ lạnh phổ biến */}
+                <div className="flex items-center gap-1 pt-1 overflow-x-auto">
+                  <span className="text-[10px] text-slate-500 shrink-0">Gợi ý nhanh:</span>
+                  {[600, 750, 850, 900, 1000].map((w) => (
+                    <button
+                      key={w}
+                      onClick={() => updatePlacedModuleCustomWidth(selectedModule.instanceId, w)}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition border ${
+                        selectedModule.width === w
+                          ? 'bg-blue-600 text-white border-blue-400 font-bold'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                      }`}
+                    >
+                      {w}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Khoang góc nối tủ dưới (K01): Tùy chỉnh linh hoạt từ 980mm đến 1030mm (Khuyến nghị 1000mm) */}
             {selectedModule.code === 'K01' && (
               <div className="space-y-2 pt-2 border-t border-slate-800">
@@ -986,42 +1093,66 @@ export const RightSidebar: React.FC = () => {
               </div>
             </div>
 
-            {/* Chuyển sang cạnh khác */}
+            {/* Chuyển sang cạnh khác (Shape L & Shape U) */}
             {(layout.shape === 'L' || layout.shape === 'U') && (
-              <div className="space-y-1.5 pt-1 border-t border-slate-800">
-                <label className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
-                  <ArrowLeftRight className="w-3 h-3 text-slate-400" />
-                  <span>Chuyển sang cạnh khác:</span>
-                </label>
-                <div className="flex gap-1.5">
+              <div className="space-y-2 pt-2.5 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-sky-400 flex items-center gap-1.5">
+                    <ArrowLeftRight className="w-3.5 h-3.5" />
+                    <span>Chuyển sang cạnh khác:</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    Hiện tại: <strong className="text-white">{selectedModule.edgeId === 'edge_A' ? 'Cạnh A' : selectedModule.edgeId === 'edge_B' ? 'Cạnh B' : 'Cạnh C'}</strong>
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
                   <button
                     disabled={selectedModule.edgeId === 'edge_A'}
-                    onClick={() =>
-                      moveModule(selectedModule.instanceId, 'edge_A', 999)
-                    }
-                    className="flex-1 py-1 rounded bg-slate-950 border border-slate-800 text-xs font-medium text-slate-300 hover:text-white disabled:opacity-40"
+                    onClick={() => moveModule(selectedModule.instanceId, 'edge_A', 999)}
+                    className={`py-2 px-1.5 rounded-xl text-xs font-bold transition flex flex-col items-center gap-0.5 border ${
+                      selectedModule.edgeId === 'edge_A'
+                        ? 'bg-sky-500/20 text-sky-300 border-sky-500/40 cursor-default'
+                        : 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800 hover:border-sky-500'
+                    }`}
                   >
-                    Cạnh A
+                    <span>Cạnh A</span>
+                    <span className="text-[9px] opacity-70 font-normal">
+                      {selectedModule.edgeId === 'edge_A' ? '(Đang đặt)' : 'Chuyển sang'}
+                    </span>
                   </button>
                   <button
                     disabled={selectedModule.edgeId === 'edge_B'}
-                    onClick={() =>
-                      moveModule(selectedModule.instanceId, 'edge_B', 999)
-                    }
-                    className="flex-1 py-1 rounded bg-slate-950 border border-slate-800 text-xs font-medium text-slate-300 hover:text-white disabled:opacity-40"
+                    onClick={() => moveModule(selectedModule.instanceId, 'edge_B', 999)}
+                    className={`py-2 px-1.5 rounded-xl text-xs font-bold transition flex flex-col items-center gap-0.5 border ${
+                      selectedModule.edgeId === 'edge_B'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 cursor-default'
+                        : 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800 hover:border-emerald-500'
+                    }`}
                   >
-                    Cạnh B
+                    <span>Cạnh B</span>
+                    <span className="text-[9px] opacity-70 font-normal">
+                      {selectedModule.edgeId === 'edge_B' ? '(Đang đặt)' : 'Chuyển sang'}
+                    </span>
                   </button>
-                  {layout.shape === 'U' && (
+                  {layout.shape === 'U' ? (
                     <button
                       disabled={selectedModule.edgeId === 'edge_C'}
-                      onClick={() =>
-                        moveModule(selectedModule.instanceId, 'edge_C', 999)
-                      }
-                      className="flex-1 py-1 rounded bg-slate-950 border border-slate-800 text-xs font-medium text-slate-300 hover:text-white disabled:opacity-40"
+                      onClick={() => moveModule(selectedModule.instanceId, 'edge_C', 999)}
+                      className={`py-2 px-1.5 rounded-xl text-xs font-bold transition flex flex-col items-center gap-0.5 border ${
+                        selectedModule.edgeId === 'edge_C'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 cursor-default'
+                          : 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800 hover:border-amber-500'
+                      }`}
                     >
-                      Cạnh C
+                      <span>Cạnh C</span>
+                      <span className="text-[9px] opacity-70 font-normal">
+                        {selectedModule.edgeId === 'edge_C' ? '(Đang đặt)' : 'Chuyển sang'}
+                      </span>
                     </button>
+                  ) : (
+                    <div className="py-2 px-1.5 rounded-xl bg-slate-950/40 border border-slate-800 text-slate-600 text-xs flex flex-col items-center justify-center">
+                      <span>-</span>
+                    </div>
                   )}
                 </div>
               </div>
