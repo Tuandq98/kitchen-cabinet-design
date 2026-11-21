@@ -308,10 +308,10 @@ export class LayoutEngine {
       },
       {
         id: 'strat-i-opt3',
-        title: 'Phương án khối tủ cao tập trung bên trái: Tủ khô ➔ Tủ thiết bị ➔ Tủ lạnh ➔ Bàn bếp',
-        order: ['P01', 'A01', 'F01', 'C01', 'W01', 'S01', 'D01', 'R01', 'B01', 'SP01', 'M01', 'T01'],
+        title: 'Phương án khối tủ cao tập trung bên trái: Tủ lạnh ➔ Tủ khô ➔ Tủ thiết bị ➔ Bàn bếp',
+        order: ['F01', 'P01', 'A01', 'C01', 'W01', 'S01', 'D01', 'R01', 'B01', 'SP01', 'M01', 'T01'],
         pros: [
-          'Toàn bộ hệ tủ cao tập trung thành một khối đứng đồng nhất bên trái',
+          'Tủ lạnh ưu tiên ở mép ngoài cùng bên trái, tiếp theo là cụm tủ khô và thiết bị',
           'Mặt bàn bếp trải dài liền mạch từ giữa sang phải',
         ],
         cons: ['Bếp nấu nằm gần mép phải'],
@@ -328,10 +328,10 @@ export class LayoutEngine {
       },
       {
         id: 'strat-i-opt5',
-        title: 'Phương án khối tủ cao tập trung bên phải: Bàn bếp ➔ Tủ lạnh ➔ Tủ thiết bị ➔ Tủ khô',
-        order: ['T01', 'M01', 'SP01', 'B01', 'R01', 'D01', 'S01', 'W01', 'C01', 'F01', 'A01', 'P01'],
+        title: 'Phương án khối tủ cao tập trung bên phải: Bàn bếp ➔ Cụm tủ khô & thiết bị ➔ Tủ lạnh mép ngoài',
+        order: ['T01', 'M01', 'SP01', 'B01', 'R01', 'D01', 'S01', 'W01', 'C01', 'P01', 'A01', 'F01'],
         pros: [
-          'Hệ tủ cao quy tụ về một phía bên phải phòng bếp',
+          'Hệ tủ cao quy tụ về một phía bên phải phòng bếp với tủ lạnh ngoài cùng',
           'Khu nấu và rửa thông thoáng',
         ],
         cons: ['Khối tủ cao bên phải'],
@@ -460,33 +460,43 @@ export class LayoutEngine {
     const strategies = [
       {
         id: 'strat-l-opt1',
-        title: 'Phương án 1: Tam giác công năng chuẩn NKBA (Lưu trữ + Chậu Cạnh A | Bếp Cạnh B)',
+        title: 'Phương án 1: Tam giác công năng chuẩn NKBA (Lưu trữ + Chậu Cạnh A | Bếp & Khối tủ cao Cạnh B)',
         assign: {
-          edgeA: filterCodes(['W01', 'S01', 'D01', 'T01', 'F01', 'A01', 'P01']),
-          edgeB: filterCodes(['C01', 'R01', 'B01', 'SP01', 'M01', 'T01']),
+          edgeA: filterCodes(['W01', 'S01', 'D01', 'T01', 'F01']),
+          edgeB: filterCodes(['C01', 'R01', 'B01', 'SP01', 'M01', 'T01', 'P01', 'A01']),
         },
-        pros: ['Tam giác công năng cực kỳ lý tưởng', 'Bếp tách riêng khỏi chậu tạo không gian nấu thoáng'],
-        cons: ['Cạnh B cần đủ dài cho khoang bếp và giá gia vị'],
+        pros: [
+          'Tam giác công năng cực kỳ lý tưởng',
+          'Tủ lạnh ở rìa Cạnh A, khối tủ cao kề nhau (tủ khô & thiết bị) ở rìa Cạnh B tạo thế cân đối',
+          'Bếp tách riêng khỏi chậu tạo không gian nấu thoáng',
+        ],
+        cons: ['Cạnh B cần đủ dài cho khoang bếp và khối tủ cao'],
       },
       {
         id: 'strat-l-opt2',
-        title: 'Phương án 2: Bếp nấu Cạnh A, Tủ lạnh & Chậu Cạnh B',
+        title: 'Phương án 2: Bếp nấu & Khối tủ cao Cạnh A, Tủ lạnh & Chậu Cạnh B',
         assign: {
-          edgeA: filterCodes(['C01', 'B01', 'SP01', 'R01', 'M01', 'T01']),
-          edgeB: filterCodes(['W01', 'S01', 'D01', 'T01', 'F01', 'A01', 'P01']),
+          edgeA: filterCodes(['C01', 'B01', 'SP01', 'R01', 'M01', 'T01', 'P01', 'A01']),
+          edgeB: filterCodes(['W01', 'S01', 'D01', 'T01', 'F01']),
         },
-        pros: ['Tủ lạnh tách biệt ở cuối cạnh B, bếp nấu cạnh A an toàn tuyệt đối', 'Đạt đầy đủ tiêu chuẩn cách ly nhiệt độ'],
+        pros: [
+          'Tủ lạnh tách biệt ở cuối Cạnh B, khối tủ cao kề nhau ở cuối Cạnh A',
+          'Đạt đầy đủ tiêu chuẩn cách ly nhiệt độ và cân đối không gian',
+        ],
         cons: ['Cạnh B cần đủ dài cho khoang chậu và tủ lạnh'],
       },
       {
         id: 'strat-l-opt3',
-        title: 'Phương án 3: Bếp trung tâm Cạnh A, Khối tủ cao Cạnh B',
+        title: 'Phương án 3: Bàn bếp Cạnh A, Toàn bộ khối tủ cao quy tụ Cạnh B',
         assign: {
-          edgeA: filterCodes(['T01', 'B01', 'SP01', 'M01', 'R01']),
-          edgeB: filterCodes(['C01', 'S01', 'D01', 'W01', 'T01', 'F01', 'A01', 'P01']),
+          edgeA: filterCodes(['W01', 'S01', 'D01', 'C01', 'B01', 'SP01', 'M01', 'R01', 'T01']),
+          edgeB: filterCodes(['T01', 'P01', 'A01', 'F01']),
         },
-        pros: ['Khu vực nấu hoành tráng làm điểm nhấn phòng bếp', 'Thích hợp cho căn hộ mở nối liền phòng khách'],
-        cons: ['Đường ống cấp thoát nước tập trung ở cạnh B'],
+        pros: [
+          'Khu vực nấu và chuẩn bị trải dài thoáng đãng trên Cạnh A',
+          'Hệ tủ cao quy tụ ở rìa Cạnh B với tủ lạnh ở mép ngoài cùng',
+        ],
+        cons: ['Cạnh B cần đủ dài cho cụm 3 tủ cao'],
       },
     ];
 
@@ -655,24 +665,31 @@ export class LayoutEngine {
     const strategies = [
       {
         id: 'strat-u-opt1',
-        title: 'Phương án 1: Bếp chữ U chuẩn - Chậu giữa, Tủ lạnh trái, Bếp phải',
+        title: 'Phương án 1: Bếp chữ U chuẩn - Chậu giữa Cạnh A, Tủ lạnh Cạnh B, Bếp & Khối tủ cao Cạnh C',
         assign: {
-          edgeB: filterCodes(['T01', 'F01', 'P01', 'A01']),
+          edgeB: filterCodes(['T01', 'F01']),
           edgeA: filterCodes(['W01', 'D01', 'S01', 'C01']),
-          edgeC: filterCodes(['R01', 'B01', 'SP01', 'M01', 'T01']),
+          edgeC: filterCodes(['R01', 'B01', 'SP01', 'M01', 'T01', 'P01', 'A01']),
         },
-        pros: ['Phân tách 3 trạm công năng vào 3 cạnh độc lập', 'Đạt tỉ lệ tam giác công năng hoàn hảo nhất'],
+        pros: [
+          'Phân tách 3 trạm công năng vào 3 cạnh độc lập',
+          'Tủ lạnh ở rìa Cạnh B cân đối hoàn hảo với khối tủ cao kề nhau ở rìa Cạnh C',
+          'Đạt tỉ lệ tam giác công năng hoàn hảo nhất',
+        ],
         cons: ['Cần không gian bếp rộng rãi'],
       },
       {
         id: 'strat-u-opt2',
-        title: 'Phương án 2: Bếp nấu ở giữa, Chậu rửa & Tủ lạnh 2 bên',
+        title: 'Phương án 2: Bếp nấu ở giữa Cạnh A, Chậu & Tủ lạnh Cạnh B, Khối tủ cao Cạnh C',
         assign: {
-          edgeB: filterCodes(['T01', 'F01', 'P01', 'A01']),
+          edgeB: filterCodes(['W01', 'S01', 'D01', 'T01', 'F01']),
           edgeA: filterCodes(['C01', 'B01', 'SP01', 'M01', 'T01']),
-          edgeC: filterCodes(['W01', 'C01', 'S01', 'D01', 'T01']),
+          edgeC: filterCodes(['T01', 'P01', 'A01']),
         },
-        pros: ['Khu vực nấu nướng là tâm điểm chú ý', '2 cánh phụ hỗ trợ thao tác nhanh'],
+        pros: [
+          'Khu vực nấu nướng là tâm điểm chú ý ở Cạnh A',
+          'Tủ lạnh Cạnh B đối trọng cân đối với Khối tủ cao kề nhau ở Cạnh C',
+        ],
         cons: ['Cần ống hút mùi thoát thẳng hoặc chạy qua trần giả cạnh A'],
       },
     ];

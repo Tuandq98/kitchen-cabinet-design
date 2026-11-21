@@ -751,10 +751,9 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
         placedModules = genResult.candidates[0].layout.placedModules;
       } else {
         // Fallback: Sắp xếp tuần tự các khoang đã chọn theo chuẩn công thái học để luôn tạo được bếp
+        // Tủ lạnh (F01) ở ngoài cùng mép trái, khoang bàn bếp ở giữa, khối tủ cao P01 + A01 ở ngoài cùng mép phải
         const orderRank: Record<string, number> = {
-          P01: 10,
-          A01: 15,
-          F01: 20,
+          F01: 10,
           C01: 30,
           W01: 40,
           S01: 50,
@@ -764,6 +763,8 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
           SP01: 90,
           M01: 100,
           T01: 110,
+          P01: 120,
+          A01: 130,
         };
 
         const sortedCodes = [...baseCodes].sort(
@@ -983,10 +984,9 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
         placedModules = genResult.candidates[0].layout.placedModules;
       } else {
         // Fallback: Sắp xếp tuần tự các khoang đã chọn theo chuẩn công thái học để luôn tạo được bếp
+        // Tủ lạnh (F01) ở ngoài cùng mép trái, khoang bàn bếp ở giữa, khối tủ cao P01 + A01 ở ngoài cùng mép phải
         const orderRank: Record<string, number> = {
-          P01: 10,
-          A01: 15,
-          F01: 20,
+          F01: 10,
           C01: 30,
           W01: 40,
           S01: 50,
@@ -996,6 +996,8 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
           SP01: 90,
           M01: 100,
           T01: 110,
+          P01: 120,
+          A01: 130,
         };
 
         const sortedCodes = [...baseCodes].sort(

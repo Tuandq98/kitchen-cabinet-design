@@ -5,6 +5,7 @@ import {
   RuleViolation,
   WorkTriangleMetrics,
   KitchenModule,
+  EdgeId,
 } from '../../types';
 import { calculateLayout2D, getDistanceBetweenModules, getAvailableEdgeLength, getModuleGap } from '../../utils/geometry';
 
@@ -84,6 +85,14 @@ export class RuleEngine {
 
         case 'FRIDGE_AT_EDGE':
           this.checkFridgeAtEdge(layout, rule, violations);
+          break;
+
+        case 'TALL_UNITS_AT_EDGE':
+          this.checkTallUnitsAtEdge(layout, rule, violations);
+          break;
+
+        case 'TALL_PANTRY_APPLIANCE_ADJACENT':
+          this.checkTallPantryApplianceAdjacent(layout, rule, violations);
           break;
 
         case 'UPPER_MAX_STORAGE_WIDTH':
@@ -618,6 +627,156 @@ export class RuleEngine {
           involvedModuleIds: [fridge.instanceId],
         });
       }
+    }
+  }
+
+  private checkTallUnitsAtEdge(
+    layout: KitchenLayout,
+    rule: DesignRule,
+    violations: RuleViolation[]
+  ): void {
+    const tallCodes = ['P01', 'A01', 'F01'];
+    const tallModules = layout.placedModules.filter((m) =>
+      tallCodes.includes(m.code) || m.category === 'refrigeration'
+    );
+    if (tallModules.length === 0) return;
+
+    for (const tall of tallModules) {
+      const edgeModules = layout.placedModules
+        .filter((m) => m.edgeId === tall.edgeId)
+        .sort((a, b) => a.positionIndex - b.positionIndex);
+
+      if (edgeModules.length <= 1) continue;
+
+      const idx = edgeModules.findIndex((m) => m.instanceId === tall.instanceId);
+      const isFirst = idx === 0;
+      const isLast = idx === edgeModules.length - 1;
+
+      // Kiểm tra xem phía ngoài của khoang này có phải chỉ toàn là các khoang tủ đứng (F01, P01, A01) hay không
+      const leftModules = edgeModules.slice(0, idx);
+      const rightModules = edgeModules.slice(idx + 1);
+      const leftIsAllTall = leftModules.length > 0 && leftModules.every((m) => tallCodes.includes(m.code) || m.category === 'refrigeration');
+      const rightIsAllTall = rightModules.length > 0 && rightModules.every((m) => tallCodes.includes(m.code) || m.category === 'refrigeration');
+
+      let isEdgeValid = false;
+      if (layout.shape === 'I') {
+        // Bếp chữ I: 2 đầu cạnh là mép ngoài cùng (hoặc nằm liền kề trong khối tủ cao ở mép ngoài)
+        isEdgeValid = isFirst || isLast || leftIsAllTall || rightIsAllTall;
+      } else if (layout.shape === 'L') {
+        // Bếp chữ L: idx=0 là góc giao, mép ngoài cùng là cuối cạnh hoặc liền kề cụm tủ cao ở cuối
+        isEdgeValid = isLast || rightIsAllTall;
+      } else if (layout.shape === 'U') {
+        // Bếp chữ U: Cạnh A bị kẹp bởi 2 góc. Chỉ có cuối Cạnh B hoặc Cạnh C mới là mép ngoài
+        if (tall.edgeId === 'edge_A') {
+          isEdgeValid = false;
+        } else {
+          isEdgeValid = isLast || rightIsAllTall;
+        }
+      }
+
+      if (!isEdgeValid) {
+        violations.push({
+          ruleId: rule.id,
+          ruleCode: rule.code,
+          ruleName: rule.name,
+          severity: rule.severity,
+          message: `Khoang tủ đứng "${tall.name}" (${tall.code}) đang bị kẹp ở giữa các khoang bàn bếp thao tác (vị trí thứ ${idx + 1}/${edgeModules.length} trên ${tall.edgeId === 'edge_A' ? 'Cạnh A' : tall.edgeId === 'edge_B' ? 'Cạnh B' : 'Cạnh C'}).`,
+          recommendation: `Các tủ đứng cao tầng (Tủ lạnh, Tủ đồ khô, Tủ thiết bị cao) phải được bố trí ở phía ngoài cùng của dãy tủ bếp để không làm đứt đoạn mặt bàn bếp sơ chế và nấu nướng.`,
+          involvedModuleIds: [tall.instanceId],
+        });
+      }
+    }
+
+    // Kiểm tra ưu tiên: "Ưu tiên tủ lạnh đặt trước, sau đó đến vị trí hai loại tủ này"
+    const edgesToCheck: EdgeId[] = ['edge_A', 'edge_B', 'edge_C'];
+    for (const eId of edgesToCheck) {
+      const edgeMods = layout.placedModules
+        .filter((m) => m.edgeId === eId)
+        .sort((a, b) => a.positionIndex - b.positionIndex);
+      const fIdx = edgeMods.findIndex((m) => m.code === 'F01');
+      if (fIdx === -1) continue;
+
+      const pIdx = edgeMods.findIndex((m) => m.code === 'P01');
+      const aIdx = edgeMods.findIndex((m) => m.code === 'A01');
+      const otherTallIndices = [pIdx, aIdx].filter((i) => i !== -1);
+      if (otherTallIndices.length === 0) continue;
+
+      // Nếu cùng nằm trong 1 cụm tủ đứng ở mép
+      if (otherTallIndices.some((idx) => Math.abs(idx - fIdx) <= 2)) {
+        const minIdx = Math.min(fIdx, ...otherTallIndices);
+        const maxIdx = Math.max(fIdx, ...otherTallIndices);
+
+        if (minIdx === 0 && fIdx !== 0) {
+          // Nằm ở đầu mép trái nhưng F01 không đứng ở ngoài cùng nhất
+          violations.push({
+            ruleId: rule.id,
+            ruleCode: rule.code,
+            ruleName: rule.name,
+            severity: 'WARNING',
+            message: `Tại khối tủ đứng ở đầu mép trái, Khoang tủ lạnh (F01) nên được ưu tiên đặt ở vị trí mép ngoài cùng nhất trước khoang tủ đồ khô/thiết bị cao tầng để thuận tiện tiếp cận thực phẩm.`,
+            recommendation: `Đổi vị trí để Khoang tủ lạnh (F01) nằm ở mép ngoài cùng (vị trí số 1), sau đó tiếp giáp đến các khoang tủ đồ khô/thiết bị cao tầng.`,
+            involvedModuleIds: [edgeMods[fIdx].instanceId],
+          });
+        } else if (maxIdx === edgeMods.length - 1 && fIdx !== edgeMods.length - 1 && minIdx > 0) {
+          const allAreTall = edgeMods.slice(minIdx).every((m) => tallCodes.includes(m.code));
+          if (allAreTall && fIdx < Math.max(...otherTallIndices)) {
+            violations.push({
+              ruleId: rule.id,
+              ruleCode: rule.code,
+              ruleName: rule.name,
+              severity: 'WARNING',
+              message: `Tại khối tủ đứng ở mép ngoài cùng bên phải, Khoang tủ lạnh (F01) nên được ưu tiên đặt ở vị trí mép ngoài cùng trước các khoang tủ đồ khô/thiết bị cao tầng.`,
+              recommendation: `Bố trí Khoang tủ lạnh (F01) ở vị trí ngoài cùng của khối tủ cao.`,
+              involvedModuleIds: [edgeMods[fIdx].instanceId],
+            });
+          }
+        }
+      }
+    }
+  }
+
+  private checkTallPantryApplianceAdjacent(
+    layout: KitchenLayout,
+    rule: DesignRule,
+    violations: RuleViolation[]
+  ): void {
+    const p01 = layout.placedModules.find((m) => m.code === 'P01');
+    const a01 = layout.placedModules.find((m) => m.code === 'A01');
+
+    if (!p01 || !a01) return;
+
+    // 1. Kiểm tra có nằm cùng trên một cạnh hay không
+    if (p01.edgeId !== a01.edgeId) {
+      violations.push({
+        ruleId: rule.id,
+        ruleCode: rule.code,
+        ruleName: rule.name,
+        severity: rule.severity,
+        message: `Khoang tủ đồ khô (${p01.name} - P01) và Khoang tủ thiết bị (${a01.name} - A01) đang nằm ở 2 cạnh khác nhau (${p01.edgeId === 'edge_A' ? 'Cạnh A' : p01.edgeId === 'edge_B' ? 'Cạnh B' : 'Cạnh C'} và ${a01.edgeId === 'edge_A' ? 'Cạnh A' : a01.edgeId === 'edge_B' ? 'Cạnh B' : 'Cạnh C'}).`,
+        recommendation: `Khoang tủ đồ khô cao tầng và khoang tủ thiết bị cao tầng nên đặt cạnh nhau để tạo thành khối tủ đứng thống nhất, cân đối với vị trí tủ lạnh ở khu vực rìa đối diện.`,
+        involvedModuleIds: [p01.instanceId, a01.instanceId],
+      });
+      return;
+    }
+
+    // 2. Nếu cùng cạnh, kiểm tra xem có đặt liền kề nhau không (không bị các khoang khác xen vào giữa)
+    const edgeModules = layout.placedModules
+      .filter((m) => m.edgeId === p01.edgeId)
+      .sort((a, b) => a.positionIndex - b.positionIndex);
+
+    const idxP = edgeModules.findIndex((m) => m.instanceId === p01.instanceId);
+    const idxA = edgeModules.findIndex((m) => m.instanceId === a01.instanceId);
+
+    if (Math.abs(idxP - idxA) !== 1) {
+      violations.push({
+        ruleId: rule.id,
+        ruleCode: rule.code,
+        ruleName: rule.name,
+        severity: rule.severity,
+        message: `Khoang tủ đồ khô cao tầng (P01) và Khoang tủ thiết bị cao tầng (A01) đang bị phân tách bởi các khoang khác.`,
+        recommendation: `Nên đặt khoang tủ đồ khô và khoang tủ thiết bị cao tầng liền kề nhau để tạo thành khối tủ đứng đồng nhất, cân đối với tủ lạnh ở rìa đối diện.`,
+        involvedModuleIds: [p01.instanceId, a01.instanceId],
+      });
     }
   }
 

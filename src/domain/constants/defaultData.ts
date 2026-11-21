@@ -446,6 +446,28 @@ export const DEFAULT_RULES: DesignRule[] = [
     weight: 25,
     config: {},
   },
+  {
+    id: 'rule-tall-units-at-edge',
+    code: 'RULE_08',
+    name: 'Các hệ tủ đứng cao tầng phải đặt ở phía ngoài cùng',
+    description: 'Các khoang tủ đứng (Khoang tủ đồ khô cao tầng P01, Khoang tủ thiết bị cao tầng A01, Khoang tủ lạnh F01) là khối tủ cao chiếm trọn chiều cao phòng bếp. Để không làm đứt đoạn mặt bàn bếp sơ chế và nấu nướng, các khoang này bắt buộc phải được bố trí ở phía ngoài cùng của dãy tủ bếp. Ưu tiên tủ lạnh đặt trước ở mép ngoài, sau đó đến vị trí hai loại tủ đứng này.',
+    type: 'TALL_UNITS_AT_EDGE',
+    severity: 'ERROR', // Hard constraint
+    enabled: true,
+    weight: 20,
+    config: {},
+  },
+  {
+    id: 'rule-tall-pantry-appliance-adjacent',
+    code: 'RULE_09',
+    name: 'Tủ đồ khô cao và Tủ thiết bị cao nên đặt cạnh nhau',
+    description: 'Khoang tủ đồ khô cao tầng (P01) và khoang tủ thiết bị cao tầng (A01) nên được bố trí liền kề nhau để tạo thành khối tủ đứng thống nhất, cân đối với vị trí tủ lạnh (F01) ở khu vực rìa đối diện.',
+    type: 'TALL_PANTRY_APPLIANCE_ADJACENT',
+    severity: 'WARNING', // Soft constraint
+    enabled: true,
+    weight: 15,
+    config: {},
+  },
 
   // --- NHÓM 2: AN TOÀN BỀ MẶT THAO TÁC (SAFETY & CLEARANCE) ---
   {
