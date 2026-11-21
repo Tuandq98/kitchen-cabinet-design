@@ -37,6 +37,29 @@ function removeVietnameseTones(str: string): string {
     .trim();
 }
 
+function matchesModuleSearch(mod: KitchenModule, query: string): boolean {
+  if (!query) return true;
+  const rawTerm = query.trim().toLowerCase();
+  if (!rawTerm) return true;
+
+  // 1. Khớp mã khoang (VD: F01, B01, UB01)
+  const codeLower = mod.code.toLowerCase();
+  if (codeLower.includes(rawTerm)) return true;
+
+  const cleanTerm = removeVietnameseTones(rawTerm);
+  const nameClean = removeVietnameseTones(mod.name);
+  const nameLower = mod.name.toLowerCase();
+
+  const hasTones = rawTerm !== cleanTerm;
+  if (hasTones) {
+    // Người dùng gõ có dấu (VD: "tủ", "bếp", "chậu") -> khớp chính xác tên hiển thị có dấu
+    return nameLower.includes(rawTerm);
+  } else {
+    // Người dùng gõ không dấu (VD: "tu", "bep", "chau") -> khớp không dấu tên hiển thị
+    return nameClean.includes(cleanTerm);
+  }
+}
+
 interface LeftSidebarProps {
   onOpenCatalogModal: () => void;
   onOpenRulesModal: () => void;
@@ -91,19 +114,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     }
   };
 
-  // Lọc catalog (hỗ trợ tìm kiếm tiếng Việt không dấu và có dấu, mã khoang, mô tả)
+  // Lọc catalog (tìm kiếm theo tên hiển thị và mã khoang, hỗ trợ cả tiếng Việt có dấu và không dấu)
   const filteredCatalog = catalog.filter((mod) => {
-    const searchClean = removeVietnameseTones(searchTerm);
-    const nameClean = removeVietnameseTones(mod.name);
-    const codeClean = mod.code.toLowerCase();
-    const descClean = removeVietnameseTones(mod.description || '');
-
-    const matchesSearch =
-      !searchTerm ||
-      nameClean.includes(searchClean) ||
-      codeClean.includes(searchTerm.toLowerCase().trim()) ||
-      descClean.includes(searchClean);
-
+    const matchesSearch = matchesModuleSearch(mod, searchTerm);
     const matchesCat =
       selectedCategory === 'all' || mod.category === selectedCategory;
     const matchesTier =

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useKitchenStore } from '../../store/useKitchenStore';
-import { KitchenShape, ModuleCategory } from '../../types';
+import { KitchenShape, ModuleCategory, KitchenModule } from '../../types';
 import {
   ChefHat,
   Layers,
@@ -30,18 +30,41 @@ function removeVietnameseTones(str: string): string {
     .trim();
 }
 
+function matchesModuleSearch(mod: KitchenModule, query: string): boolean {
+  if (!query) return true;
+  const rawTerm = query.trim().toLowerCase();
+  if (!rawTerm) return true;
+
+  // 1. Khớp mã khoang (VD: F01, B01, S01)
+  const codeLower = mod.code.toLowerCase();
+  if (codeLower.includes(rawTerm)) return true;
+
+  const cleanTerm = removeVietnameseTones(rawTerm);
+  const nameClean = removeVietnameseTones(mod.name);
+  const nameLower = mod.name.toLowerCase();
+
+  const hasTones = rawTerm !== cleanTerm;
+  if (hasTones) {
+    // Người dùng gõ có dấu (VD: "tủ", "bếp", "chậu") -> khớp chính xác tên hiển thị có dấu
+    return nameLower.includes(rawTerm);
+  } else {
+    // Người dùng gõ không dấu (VD: "tu", "bep", "chau") -> khớp không dấu tên hiển thị
+    return nameClean.includes(cleanTerm);
+  }
+}
+
 interface KitchenSetupWizardProps {
   isOpen: boolean;
   onClose?: () => void;
 }
 
 interface ShapePreset {
-  lengthA: number;
-  depthA: number;
-  lengthB: number;
-  depthB: number;
-  lengthC: number;
-  depthC: number;
+  lengthA: number | string;
+  depthA: number | string;
+  lengthB: number | string;
+  depthB: number | string;
+  lengthC: number | string;
+  depthC: number | string;
   selectedCodes: string[];
 }
 
@@ -109,12 +132,12 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
     }));
   };
 
-  const setLengthA = (val: number) => updateCurrentPreset({ lengthA: val });
-  const setDepthA = (val: number) => updateCurrentPreset({ depthA: val });
-  const setLengthB = (val: number) => updateCurrentPreset({ lengthB: val });
-  const setDepthB = (val: number) => updateCurrentPreset({ depthB: val });
-  const setLengthC = (val: number) => updateCurrentPreset({ lengthC: val });
-  const setDepthC = (val: number) => updateCurrentPreset({ depthC: val });
+  const setLengthA = (val: number | string) => updateCurrentPreset({ lengthA: val });
+  const setDepthA = (val: number | string) => updateCurrentPreset({ depthA: val });
+  const setLengthB = (val: number | string) => updateCurrentPreset({ lengthB: val });
+  const setDepthB = (val: number | string) => updateCurrentPreset({ depthB: val });
+  const setLengthC = (val: number | string) => updateCurrentPreset({ lengthC: val });
+  const setDepthC = (val: number | string) => updateCurrentPreset({ depthC: val });
 
   if (!isOpen) return null;
 
@@ -122,16 +145,7 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
   const baseCatalogModules = catalog.filter((m) => m.tier !== 'upper');
 
   const displayedBaseModules = baseCatalogModules.filter((mod) => {
-    if (!wizardSearchTerm) return true;
-    const searchClean = removeVietnameseTones(wizardSearchTerm);
-    const nameClean = removeVietnameseTones(mod.name);
-    const codeClean = mod.code.toLowerCase();
-    const descClean = removeVietnameseTones(mod.description || '');
-    return (
-      nameClean.includes(searchClean) ||
-      codeClean.includes(wizardSearchTerm.toLowerCase().trim()) ||
-      descClean.includes(searchClean)
-    );
+    return matchesModuleSearch(mod, wizardSearchTerm);
   });
 
   const handleShapeChange = (newShape: KitchenShape) => {
@@ -175,11 +189,18 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
   };
 
   const handleStartDesign = () => {
+    const finalLengthA = Math.max(1200, Math.min(10000, Number(lengthA) || 3600));
+    const finalDepthA = Math.max(500, Math.min(1000, Number(depthA) || 600));
+    const finalLengthB = Math.max(1200, Math.min(10000, Number(lengthB) || 2400));
+    const finalDepthB = Math.max(500, Math.min(1000, Number(depthB) || 600));
+    const finalLengthC = Math.max(1200, Math.min(10000, Number(lengthC) || 2400));
+    const finalDepthC = Math.max(500, Math.min(1000, Number(depthC) || 600));
+
     initKitchenLayout({
       shape,
-      edgeA: { length: Number(lengthA), depth: Number(depthA) },
-      edgeB: shape === 'L' || shape === 'U' ? { length: Number(lengthB), depth: Number(depthB) } : undefined,
-      edgeC: shape === 'U' ? { length: Number(lengthC), depth: Number(depthC) } : undefined,
+      edgeA: { length: finalLengthA, depth: finalDepthA },
+      edgeB: shape === 'L' || shape === 'U' ? { length: finalLengthB, depth: finalDepthB } : undefined,
+      edgeC: shape === 'U' ? { length: finalLengthC, depth: finalDepthC } : undefined,
       baseModuleCodes: selectedBaseCodes,
     });
     onClose?.();
@@ -354,11 +375,24 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
                     <label className="text-[10px] text-slate-400 block mb-0.5">Dài (mm)</label>
                     <input
                       type="number"
-                      min={2400}
+                      min={1200}
                       max={10000}
                       step={50}
+                      placeholder="3600"
                       value={lengthA}
-                      onChange={(e) => setLengthA(Number(e.target.value))}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setLengthA(val === '' ? '' : Number(val));
+                      }}
+                      onBlur={() => {
+                        const val = Number(lengthA);
+                        if (!lengthA || isNaN(val) || val < 1200) {
+                          setLengthA(Math.max(1200, Math.min(10000, val || 3600)));
+                        } else if (val > 10000) {
+                          setLengthA(10000);
+                        }
+                      }}
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-sky-400 focus:outline-none focus:border-sky-500"
                     />
                   </div>
@@ -366,11 +400,24 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
                     <label className="text-[10px] text-slate-400 block mb-0.5">Sâu (mm)</label>
                     <input
                       type="number"
-                      min={550}
-                      max={700}
+                      min={500}
+                      max={1000}
                       step={10}
+                      placeholder="600"
                       value={depthA}
-                      onChange={(e) => setDepthA(Number(e.target.value))}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDepthA(val === '' ? '' : Number(val));
+                      }}
+                      onBlur={() => {
+                        const val = Number(depthA);
+                        if (!depthA || isNaN(val) || val < 500) {
+                          setDepthA(Math.max(500, Math.min(1000, val || 600)));
+                        } else if (val > 1000) {
+                          setDepthA(1000);
+                        }
+                      }}
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-slate-300 focus:outline-none focus:border-sky-500"
                     />
                   </div>
@@ -389,11 +436,24 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
                       <label className="text-[10px] text-slate-400 block mb-0.5">Dài (mm)</label>
                       <input
                         type="number"
-                        min={1500}
+                        min={1200}
                         max={10000}
                         step={50}
+                        placeholder="2400"
                         value={lengthB}
-                        onChange={(e) => setLengthB(Number(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setLengthB(val === '' ? '' : Number(val));
+                        }}
+                        onBlur={() => {
+                          const val = Number(lengthB);
+                          if (!lengthB || isNaN(val) || val < 1200) {
+                            setLengthB(Math.max(1200, Math.min(10000, val || 2400)));
+                          } else if (val > 10000) {
+                            setLengthB(10000);
+                          }
+                        }}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500"
                       />
                     </div>
@@ -401,11 +461,24 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
                       <label className="text-[10px] text-slate-400 block mb-0.5">Sâu (mm)</label>
                       <input
                         type="number"
-                        min={550}
-                        max={700}
+                        min={500}
+                        max={1000}
                         step={10}
+                        placeholder="600"
                         value={depthB}
-                        onChange={(e) => setDepthB(Number(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setDepthB(val === '' ? '' : Number(val));
+                        }}
+                        onBlur={() => {
+                          const val = Number(depthB);
+                          if (!depthB || isNaN(val) || val < 500) {
+                            setDepthB(Math.max(500, Math.min(1000, val || 600)));
+                          } else if (val > 1000) {
+                            setDepthB(1000);
+                          }
+                        }}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-slate-300 focus:outline-none focus:border-emerald-500"
                       />
                     </div>
@@ -425,11 +498,24 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
                       <label className="text-[10px] text-slate-400 block mb-0.5">Dài (mm)</label>
                       <input
                         type="number"
-                        min={1500}
+                        min={1200}
                         max={10000}
                         step={50}
+                        placeholder="2400"
                         value={lengthC}
-                        onChange={(e) => setLengthC(Number(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setLengthC(val === '' ? '' : Number(val));
+                        }}
+                        onBlur={() => {
+                          const val = Number(lengthC);
+                          if (!lengthC || isNaN(val) || val < 1200) {
+                            setLengthC(Math.max(1200, Math.min(10000, val || 2400)));
+                          } else if (val > 10000) {
+                            setLengthC(10000);
+                          }
+                        }}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-400 focus:outline-none focus:border-amber-500"
                       />
                     </div>
@@ -437,11 +523,24 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
                       <label className="text-[10px] text-slate-400 block mb-0.5">Sâu (mm)</label>
                       <input
                         type="number"
-                        min={550}
-                        max={700}
+                        min={500}
+                        max={1000}
                         step={10}
+                        placeholder="600"
                         value={depthC}
-                        onChange={(e) => setDepthC(Number(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setDepthC(val === '' ? '' : Number(val));
+                        }}
+                        onBlur={() => {
+                          const val = Number(depthC);
+                          if (!depthC || isNaN(val) || val < 500) {
+                            setDepthC(Math.max(500, Math.min(1000, val || 600)));
+                          } else if (val > 1000) {
+                            setDepthC(1000);
+                          }
+                        }}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-slate-300 focus:outline-none focus:border-amber-500"
                       />
                     </div>

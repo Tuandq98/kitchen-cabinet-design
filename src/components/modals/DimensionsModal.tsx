@@ -38,14 +38,14 @@ export const DimensionsModal: React.FC<DimensionsModalProps> = ({
     setActiveTab,
   } = useKitchenStore();
 
-  const [lengthA, setLengthA] = useState(layout.edgeA.length);
-  const [depthA, setDepthA] = useState(layout.edgeA.depth);
+  const [lengthA, setLengthA] = useState<number | string>(layout.edgeA.length);
+  const [depthA, setDepthA] = useState<number | string>(layout.edgeA.depth);
 
-  const [lengthB, setLengthB] = useState(layout.edgeB?.length || 2400);
-  const [depthB, setDepthB] = useState(layout.edgeB?.depth || 600);
+  const [lengthB, setLengthB] = useState<number | string>(layout.edgeB?.length || 2400);
+  const [depthB, setDepthB] = useState<number | string>(layout.edgeB?.depth || 600);
 
-  const [lengthC, setLengthC] = useState(layout.edgeC?.length || 2400);
-  const [depthC, setDepthC] = useState(layout.edgeC?.depth || 600);
+  const [lengthC, setLengthC] = useState<number | string>(layout.edgeC?.length || 2400);
+  const [depthC, setDepthC] = useState<number | string>(layout.edgeC?.depth || 600);
 
   // Chỉ lấy danh sách khoang Tủ Dưới
   const baseCatalog = catalog.filter((m) => m.tier !== 'upper');
@@ -104,17 +104,24 @@ export const DimensionsModal: React.FC<DimensionsModalProps> = ({
     const validBaseCodes = selectedCodes.filter((c) => !c.startsWith('U'));
     const finalCodes = validBaseCodes.length > 0 ? validBaseCodes : ['F01', 'S01', 'B01'];
 
+    const numLengthA = Math.max(1200, Math.min(10000, Number(lengthA) || 3000));
+    const numDepthA = Math.max(500, Math.min(1000, Number(depthA) || 600));
+    const numLengthB = Math.max(1200, Math.min(10000, Number(lengthB) || 2400));
+    const numDepthB = Math.max(500, Math.min(1000, Number(depthB) || 600));
+    const numLengthC = Math.max(1200, Math.min(10000, Number(lengthC) || 2400));
+    const numDepthC = Math.max(500, Math.min(1000, Number(depthC) || 600));
+
     if (autoGenerate) {
       initKitchenLayout({
         shape: layout.shape,
-        edgeA: { length: Number(lengthA), depth: Number(depthA) },
+        edgeA: { length: numLengthA, depth: numDepthA },
         edgeB:
           layout.shape === 'L' || layout.shape === 'U'
-            ? { length: Number(lengthB), depth: Number(depthB) }
+            ? { length: numLengthB, depth: numDepthB }
             : undefined,
         edgeC:
           layout.shape === 'U'
-            ? { length: Number(lengthC), depth: Number(depthC) }
+            ? { length: numLengthC, depth: numDepthC }
             : undefined,
         baseModuleCodes: finalCodes,
       });
@@ -125,21 +132,21 @@ export const DimensionsModal: React.FC<DimensionsModalProps> = ({
       }, 50);
     } else {
       updateEdgeDimensions('edge_A', {
-        length: Number(lengthA),
-        depth: Number(depthA),
+        length: numLengthA,
+        depth: numDepthA,
       });
 
       if (layout.shape === 'L' || layout.shape === 'U') {
         updateEdgeDimensions('edge_B', {
-          length: Number(lengthB),
-          depth: Number(depthB),
+          length: numLengthB,
+          depth: numDepthB,
         });
       }
 
       if (layout.shape === 'U') {
         updateEdgeDimensions('edge_C', {
-          length: Number(lengthC),
-          depth: Number(depthC),
+          length: numLengthC,
+          depth: numDepthC,
         });
       }
 
@@ -224,8 +231,18 @@ export const DimensionsModal: React.FC<DimensionsModalProps> = ({
                       min="1200"
                       max="10000"
                       step="50"
+                      placeholder="3000"
                       value={lengthA}
-                      onChange={(e) => setLengthA(Number(e.target.value))}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setLengthA(e.target.value === '' ? '' : Number(e.target.value))}
+                      onBlur={() => {
+                        const val = Number(lengthA);
+                        if (!lengthA || isNaN(val) || val < 1200) {
+                          setLengthA(Math.max(1200, Math.min(10000, val || 3000)));
+                        } else if (val > 10000) {
+                          setLengthA(10000);
+                        }
+                      }}
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 focus:outline-none focus:border-sky-500"
                     />
                   </div>
@@ -238,8 +255,18 @@ export const DimensionsModal: React.FC<DimensionsModalProps> = ({
                       min="500"
                       max="1000"
                       step="10"
+                      placeholder="600"
                       value={depthA}
-                      onChange={(e) => setDepthA(Number(e.target.value))}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setDepthA(e.target.value === '' ? '' : Number(e.target.value))}
+                      onBlur={() => {
+                        const val = Number(depthA);
+                        if (!depthA || isNaN(val) || val < 500) {
+                          setDepthA(Math.max(500, Math.min(1000, val || 600)));
+                        } else if (val > 1000) {
+                          setDepthA(1000);
+                        }
+                      }}
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 focus:outline-none focus:border-sky-500"
                     />
                   </div>
@@ -263,8 +290,18 @@ export const DimensionsModal: React.FC<DimensionsModalProps> = ({
                         min="1200"
                         max="10000"
                         step="50"
+                        placeholder="2400"
                         value={lengthB}
-                        onChange={(e) => setLengthB(Number(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setLengthB(e.target.value === '' ? '' : Number(e.target.value))}
+                        onBlur={() => {
+                          const val = Number(lengthB);
+                          if (!lengthB || isNaN(val) || val < 1200) {
+                            setLengthB(Math.max(1200, Math.min(10000, val || 2400)));
+                          } else if (val > 10000) {
+                            setLengthB(10000);
+                          }
+                        }}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 focus:outline-none focus:border-sky-500"
                       />
                     </div>
@@ -277,8 +314,18 @@ export const DimensionsModal: React.FC<DimensionsModalProps> = ({
                         min="500"
                         max="1000"
                         step="10"
+                        placeholder="600"
                         value={depthB}
-                        onChange={(e) => setDepthB(Number(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setDepthB(e.target.value === '' ? '' : Number(e.target.value))}
+                        onBlur={() => {
+                          const val = Number(depthB);
+                          if (!depthB || isNaN(val) || val < 500) {
+                            setDepthB(Math.max(500, Math.min(1000, val || 600)));
+                          } else if (val > 1000) {
+                            setDepthB(1000);
+                          }
+                        }}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 focus:outline-none focus:border-sky-500"
                       />
                     </div>
@@ -303,8 +350,18 @@ export const DimensionsModal: React.FC<DimensionsModalProps> = ({
                         min="1200"
                         max="10000"
                         step="50"
+                        placeholder="2400"
                         value={lengthC}
-                        onChange={(e) => setLengthC(Number(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setLengthC(e.target.value === '' ? '' : Number(e.target.value))}
+                        onBlur={() => {
+                          const val = Number(lengthC);
+                          if (!lengthC || isNaN(val) || val < 1200) {
+                            setLengthC(Math.max(1200, Math.min(10000, val || 2400)));
+                          } else if (val > 10000) {
+                            setLengthC(10000);
+                          }
+                        }}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 focus:outline-none focus:border-sky-500"
                       />
                     </div>
@@ -317,8 +374,18 @@ export const DimensionsModal: React.FC<DimensionsModalProps> = ({
                         min="500"
                         max="1000"
                         step="10"
+                        placeholder="600"
                         value={depthC}
-                        onChange={(e) => setDepthC(Number(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setDepthC(e.target.value === '' ? '' : Number(e.target.value))}
+                        onBlur={() => {
+                          const val = Number(depthC);
+                          if (!depthC || isNaN(val) || val < 500) {
+                            setDepthC(Math.max(500, Math.min(1000, val || 600)));
+                          } else if (val > 1000) {
+                            setDepthC(1000);
+                          }
+                        }}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 focus:outline-none focus:border-sky-500"
                       />
                     </div>

@@ -58,9 +58,9 @@ export const CatalogManagerModal: React.FC<CatalogManagerModalProps> = ({
   const [variants, setVariants] = useState<ModuleVariant[]>([]);
 
   // Variant subform
-  const [newVarWidth, setNewVarWidth] = useState(600);
-  const [newVarDepth, setNewVarDepth] = useState(600);
-  const [newVarHeight, setNewVarHeight] = useState(850);
+  const [newVarWidth, setNewVarWidth] = useState<number | string>(600);
+  const [newVarDepth, setNewVarDepth] = useState<number | string>(600);
+  const [newVarHeight, setNewVarHeight] = useState<number | string>(850);
 
   // Unsaved changes confirm dialog
   const [pendingTarget, setPendingTarget] = useState<
@@ -245,9 +245,9 @@ export const CatalogManagerModal: React.FC<CatalogManagerModalProps> = ({
       ...variants,
       {
         id: `var-${Date.now()}`,
-        width: Number(newVarWidth),
-        depth: Number(newVarDepth),
-        height: Number(newVarHeight),
+        width: Number(newVarWidth) || 600,
+        depth: Number(newVarDepth) || 600,
+        height: Number(newVarHeight) || 850,
       },
     ]);
   };
@@ -689,7 +689,11 @@ export const CatalogManagerModal: React.FC<CatalogManagerModalProps> = ({
                         <input
                           type="number"
                           value={newVarWidth}
-                          onChange={(e) => setNewVarWidth(Number(e.target.value))}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => setNewVarWidth(e.target.value === '' ? '' : Number(e.target.value))}
+                          onBlur={() => {
+                            if (!newVarWidth || Number(newVarWidth) <= 0) setNewVarWidth(600);
+                          }}
                           className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 font-mono text-slate-200 text-xs"
                         />
                       </div>
@@ -698,7 +702,11 @@ export const CatalogManagerModal: React.FC<CatalogManagerModalProps> = ({
                         <input
                           type="number"
                           value={newVarDepth}
-                          onChange={(e) => setNewVarDepth(Number(e.target.value))}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => setNewVarDepth(e.target.value === '' ? '' : Number(e.target.value))}
+                          onBlur={() => {
+                            if (!newVarDepth || Number(newVarDepth) <= 0) setNewVarDepth(600);
+                          }}
                           className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 font-mono text-slate-200 text-xs"
                         />
                       </div>
@@ -707,7 +715,11 @@ export const CatalogManagerModal: React.FC<CatalogManagerModalProps> = ({
                         <input
                           type="number"
                           value={newVarHeight}
-                          onChange={(e) => setNewVarHeight(Number(e.target.value))}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => setNewVarHeight(e.target.value === '' ? '' : Number(e.target.value))}
+                          onBlur={() => {
+                            if (!newVarHeight || Number(newVarHeight) <= 0) setNewVarHeight(850);
+                          }}
                           className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 font-mono text-slate-200 text-xs"
                         />
                       </div>

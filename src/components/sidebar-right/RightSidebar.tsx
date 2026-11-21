@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   useKitchenStore,
   getUpperModuleSpaceInfo,
@@ -74,6 +74,9 @@ export const RightSidebar: React.FC = () => {
   const baseSpaceInfo = isBaseT01Selected
     ? getBaseModuleSpaceInfo(selectedModule.instanceId, layout)
     : null;
+
+  // Local draft state để người dùng có thể xóa trắng ô nhập kích thước mà không bị kẹt số 0
+  const [customWidthDraft, setCustomWidthDraft] = useState<Record<string, string>>({});
 
   // Danh sách các khoảng trống còn lại của hệ tủ dưới
   const allBaseGaps = computeBaseGaps(layout);
@@ -490,11 +493,28 @@ export const RightSidebar: React.FC = () => {
                       min={830}
                       max={900}
                       step={5}
-                      value={selectedModule.width}
+                      placeholder="850"
+                      value={customWidthDraft[selectedModule.instanceId] ?? selectedModule.width}
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => {
-                        const val = Number(e.target.value);
+                        const str = e.target.value;
+                        setCustomWidthDraft((prev) => ({ ...prev, [selectedModule.instanceId]: str }));
+                        const val = Number(str);
                         if (!isNaN(val) && val >= 830 && val <= 900) {
                           updatePlacedModuleCustomWidth(selectedModule.instanceId, val);
+                        }
+                      }}
+                      onBlur={() => {
+                        const str = customWidthDraft[selectedModule.instanceId];
+                        if (str !== undefined) {
+                          const val = Number(str);
+                          const clamped = Math.max(830, Math.min(900, isNaN(val) || val === 0 ? 850 : val));
+                          updatePlacedModuleCustomWidth(selectedModule.instanceId, clamped);
+                          setCustomWidthDraft((prev) => {
+                            const copy = { ...prev };
+                            delete copy[selectedModule.instanceId];
+                            return copy;
+                          });
                         }
                       }}
                       className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono font-bold text-sky-400 focus:outline-none focus:border-sky-500"
@@ -579,11 +599,28 @@ export const RightSidebar: React.FC = () => {
                       min={600}
                       max={1000}
                       step={10}
-                      value={selectedModule.width}
+                      placeholder="900"
+                      value={customWidthDraft[selectedModule.instanceId] ?? selectedModule.width}
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => {
-                        const val = Number(e.target.value);
+                        const str = e.target.value;
+                        setCustomWidthDraft((prev) => ({ ...prev, [selectedModule.instanceId]: str }));
+                        const val = Number(str);
                         if (!isNaN(val) && val >= 600 && val <= 1000) {
                           updatePlacedModuleCustomWidth(selectedModule.instanceId, val);
+                        }
+                      }}
+                      onBlur={() => {
+                        const str = customWidthDraft[selectedModule.instanceId];
+                        if (str !== undefined) {
+                          const val = Number(str);
+                          const clamped = Math.max(600, Math.min(1000, isNaN(val) || val === 0 ? 900 : val));
+                          updatePlacedModuleCustomWidth(selectedModule.instanceId, clamped);
+                          setCustomWidthDraft((prev) => {
+                            const copy = { ...prev };
+                            delete copy[selectedModule.instanceId];
+                            return copy;
+                          });
                         }
                       }}
                       className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono font-bold text-blue-400 focus:outline-none focus:border-blue-500"
@@ -686,11 +723,28 @@ export const RightSidebar: React.FC = () => {
                       min={980}
                       max={1030}
                       step={5}
-                      value={selectedModule.width}
+                      placeholder="1000"
+                      value={customWidthDraft[selectedModule.instanceId] ?? selectedModule.width}
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => {
-                        const val = Number(e.target.value);
+                        const str = e.target.value;
+                        setCustomWidthDraft((prev) => ({ ...prev, [selectedModule.instanceId]: str }));
+                        const val = Number(str);
                         if (!isNaN(val) && val >= 980 && val <= 1030) {
                           updatePlacedModuleCustomWidth(selectedModule.instanceId, val);
+                        }
+                      }}
+                      onBlur={() => {
+                        const str = customWidthDraft[selectedModule.instanceId];
+                        if (str !== undefined) {
+                          const val = Number(str);
+                          const clamped = Math.max(980, Math.min(1030, isNaN(val) || val === 0 ? 1000 : val));
+                          updatePlacedModuleCustomWidth(selectedModule.instanceId, clamped);
+                          setCustomWidthDraft((prev) => {
+                            const copy = { ...prev };
+                            delete copy[selectedModule.instanceId];
+                            return copy;
+                          });
                         }
                       }}
                       className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono font-bold text-sky-400 focus:outline-none focus:border-sky-500"
@@ -775,11 +829,28 @@ export const RightSidebar: React.FC = () => {
                       min={730}
                       max={780}
                       step={5}
-                      value={selectedModule.width}
+                      placeholder="750"
+                      value={customWidthDraft[selectedModule.instanceId] ?? selectedModule.width}
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => {
-                        const val = Number(e.target.value);
+                        const str = e.target.value;
+                        setCustomWidthDraft((prev) => ({ ...prev, [selectedModule.instanceId]: str }));
+                        const val = Number(str);
                         if (!isNaN(val) && val >= 730 && val <= 780) {
                           updatePlacedModuleCustomWidth(selectedModule.instanceId, val);
+                        }
+                      }}
+                      onBlur={() => {
+                        const str = customWidthDraft[selectedModule.instanceId];
+                        if (str !== undefined) {
+                          const val = Number(str);
+                          const clamped = Math.max(730, Math.min(780, isNaN(val) || val === 0 ? 750 : val));
+                          updatePlacedModuleCustomWidth(selectedModule.instanceId, clamped);
+                          setCustomWidthDraft((prev) => {
+                            const copy = { ...prev };
+                            delete copy[selectedModule.instanceId];
+                            return copy;
+                          });
                         }
                       }}
                       className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono font-bold text-amber-400 focus:outline-none focus:border-amber-500"
@@ -865,11 +936,30 @@ export const RightSidebar: React.FC = () => {
                       min={300}
                       max={baseSpaceInfo ? baseSpaceInfo.maxAllowedWidth : 1200}
                       step={10}
-                      value={selectedModule.width}
+                      placeholder="600"
+                      value={customWidthDraft[selectedModule.instanceId] ?? selectedModule.width}
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => {
-                        const val = Number(e.target.value);
-                        if (!isNaN(val) && val >= 300) {
+                        const str = e.target.value;
+                        setCustomWidthDraft((prev) => ({ ...prev, [selectedModule.instanceId]: str }));
+                        const val = Number(str);
+                        const maxW = baseSpaceInfo ? baseSpaceInfo.maxAllowedWidth : 1200;
+                        if (!isNaN(val) && val >= 300 && val <= maxW) {
                           updatePlacedModuleCustomWidth(selectedModule.instanceId, val);
+                        }
+                      }}
+                      onBlur={() => {
+                        const str = customWidthDraft[selectedModule.instanceId];
+                        if (str !== undefined) {
+                          const val = Number(str);
+                          const maxW = baseSpaceInfo ? baseSpaceInfo.maxAllowedWidth : 1200;
+                          const clamped = Math.max(300, Math.min(maxW, isNaN(val) || val === 0 ? 600 : val));
+                          updatePlacedModuleCustomWidth(selectedModule.instanceId, clamped);
+                          setCustomWidthDraft((prev) => {
+                            const copy = { ...prev };
+                            delete copy[selectedModule.instanceId];
+                            return copy;
+                          });
                         }
                       }}
                       className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono font-bold text-amber-400 focus:outline-none focus:border-amber-500"
@@ -982,11 +1072,30 @@ export const RightSidebar: React.FC = () => {
                       min={300}
                       max={upperSpaceInfo ? upperSpaceInfo.maxAllowedWidth : 1200}
                       step={10}
-                      value={selectedModule.width}
+                      placeholder="600"
+                      value={customWidthDraft[selectedModule.instanceId] ?? selectedModule.width}
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => {
-                        const val = Number(e.target.value);
-                        if (!isNaN(val) && val >= 300) {
+                        const str = e.target.value;
+                        setCustomWidthDraft((prev) => ({ ...prev, [selectedModule.instanceId]: str }));
+                        const val = Number(str);
+                        const maxW = upperSpaceInfo ? upperSpaceInfo.maxAllowedWidth : 1200;
+                        if (!isNaN(val) && val >= 300 && val <= maxW) {
                           updatePlacedModuleCustomWidth(selectedModule.instanceId, val);
+                        }
+                      }}
+                      onBlur={() => {
+                        const str = customWidthDraft[selectedModule.instanceId];
+                        if (str !== undefined) {
+                          const val = Number(str);
+                          const maxW = upperSpaceInfo ? upperSpaceInfo.maxAllowedWidth : 1200;
+                          const clamped = Math.max(300, Math.min(maxW, isNaN(val) || val === 0 ? 600 : val));
+                          updatePlacedModuleCustomWidth(selectedModule.instanceId, clamped);
+                          setCustomWidthDraft((prev) => {
+                            const copy = { ...prev };
+                            delete copy[selectedModule.instanceId];
+                            return copy;
+                          });
                         }
                       }}
                       className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono font-bold text-sky-400 focus:outline-none focus:border-sky-500"
