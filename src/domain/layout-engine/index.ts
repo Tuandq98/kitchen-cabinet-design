@@ -260,10 +260,13 @@ export class LayoutEngine {
     const { edgeA } = input;
     const availLength = edgeA.length;
 
-    const selectedCodes =
+    const rawSelectedCodes =
       input.selectedModuleCodes && input.selectedModuleCodes.length > 0
         ? input.selectedModuleCodes
         : ['F01', 'S01', 'B01', 'D01', 'C01', 'SP01'];
+
+    // Khoang góc nối chỉ được sinh ra khi làm bếp chữ L và chữ U. Bếp chữ I tuyệt đối không có khoang góc K01.
+    const selectedCodes = rawSelectedCodes.filter((c) => c !== 'K01');
 
     // Tạo các tổ hợp chiến lược hợp lý
     const strategyConfigs: {
@@ -456,7 +459,7 @@ export class LayoutEngine {
     const selectedCodes =
       input.selectedModuleCodes && input.selectedModuleCodes.length > 0
         ? input.selectedModuleCodes
-        : ['F01', 'S01', 'B01', 'D01', 'C01', 'SP01'];
+        : ['F01', 'S01', 'B01', 'D01', 'C01', 'SP01', 'K01'];
 
     const filterCodes = (codes: string[]) =>
       codes.filter((c) => selectedCodes.includes(c));
@@ -661,7 +664,7 @@ export class LayoutEngine {
     const selectedCodes =
       input.selectedModuleCodes && input.selectedModuleCodes.length > 0
         ? input.selectedModuleCodes
-        : ['F01', 'S01', 'B01', 'D01', 'C01', 'SP01'];
+        : ['F01', 'S01', 'B01', 'D01', 'C01', 'SP01', 'K01'];
 
     const filterCodes = (codes: string[]) =>
       codes.filter((c) => selectedCodes.includes(c));

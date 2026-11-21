@@ -733,7 +733,9 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
             }
           : undefined;
 
-      const baseCodes = baseModuleCodes;
+      // Khoang góc nối chỉ được sinh ra khi làm bếp chữ L và chữ U. Bếp chữ I loại bỏ K01.
+      const baseCodes =
+        shape === 'I' ? baseModuleCodes.filter((c) => c !== 'K01') : baseModuleCodes;
 
       // Chạy generator tự động sinh phương án tối ưu số 1 từ các khoang tủ dưới đã chọn
       const genResult = layoutEngine.generateLayouts({
@@ -932,19 +934,33 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
 
       // 2. Nếu đã có bản vẽ lưu của newShape, khôi phục lại nguyên vẹn bản vẽ đó
       if (updatedShapeLayouts[newShape]) {
-        const targetLayout = updatedShapeLayouts[newShape]!;
+        let targetLayout = updatedShapeLayouts[newShape]!;
+        // Khoang góc nối chỉ được sinh ra khi làm bếp chữ L và chữ U. Bếp chữ I loại bỏ K01.
+        if (newShape === 'I') {
+          targetLayout = {
+            ...targetLayout,
+            placedModules: targetLayout.placedModules.filter(
+              (m) => m.code !== 'K01' && m.category !== 'corner'
+            ),
+            selectedModuleCodes: (targetLayout.selectedModuleCodes || []).filter(
+              (c) => c !== 'K01'
+            ),
+          };
+        }
         const rep = ruleEngineInstance.evaluate(targetLayout, state.catalog, targetLayout.designPhase);
         const targetCodes =
           targetLayout.selectedModuleCodes && targetLayout.selectedModuleCodes.length > 0
             ? targetLayout.selectedModuleCodes
             : Array.from(new Set(targetLayout.placedModules.map((m) => m.code)));
+        const finalTargetCodes = newShape === 'I' ? targetCodes.filter((c) => c !== 'K01') : targetCodes;
+
         set({
           ...pushHistory(state, targetLayout),
           shapeLayouts: updatedShapeLayouts,
           designPhase: targetLayout.designPhase || 'design_base',
           activeCabinetTier: 'all',
           validationReport: rep,
-          selectedModuleCodes: targetCodes,
+          selectedModuleCodes: finalTargetCodes,
         });
         return;
       }
@@ -1081,6 +1097,15 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
       const state = get();
       const mod = state.catalog.find((m) => m.id === moduleId);
       if (!mod) return;
+
+      // Khoang góc nối chỉ được sinh ra khi làm bếp chữ L và chữ U
+      if (
+        state.layout.shape === 'I' &&
+        (mod.category === 'corner' || mod.code === 'K01' || mod.metadata?.isCorner)
+      ) {
+        alert('Khoang góc nối chỉ được sử dụng khi thiết kế bếp chữ L hoặc chữ U!');
+        return;
+      }
 
       const variant =
         (variantId ? mod.variants.find((v) => v.id === variantId) : null) ||
@@ -1764,6 +1789,10 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
         baseCodes = state.selectedModuleCodes.filter((c) => !c.startsWith('U'));
       } else {
         baseCodes = ['F01', 'S01', 'B01', 'D01', 'C01', 'SP01'];
+      }
+
+      if (state.layout.shape === 'I') {
+        baseCodes = baseCodes.filter((c) => c !== 'K01');
       }
 
       set({ selectedModuleCodes: baseCodes });

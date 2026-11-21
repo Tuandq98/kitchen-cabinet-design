@@ -130,6 +130,7 @@ export const RuleManagerModal: React.FC<RuleManagerModalProps> = ({
                       'RULE_06',
                       'RULE_07',
                       'RULE_08',
+                      'RULE_10',
                     ].includes(r.code)
                   )
                   .map((rule) => (
@@ -329,6 +330,7 @@ export const RuleManagerModal: React.FC<RuleManagerModalProps> = ({
                     'RULE_06',
                     'RULE_07',
                     'RULE_08',
+                    'RULE_10',
                     'RULE_09',
                     'RULE_05',
                     'RULE_03',

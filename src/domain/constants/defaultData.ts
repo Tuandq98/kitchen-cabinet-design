@@ -458,6 +458,17 @@ export const DEFAULT_RULES: DesignRule[] = [
     config: {},
   },
   {
+    id: 'rule-corner-shape-validation',
+    code: 'RULE_10',
+    name: 'Khoang góc nối chỉ được sinh ra khi làm bếp chữ L và chữ U',
+    description: 'Khoang góc nối (Khoang góc liên hoàn K01 hoặc các khoang thuộc nhóm góc) chỉ được phép sử dụng trong bố cục bếp chữ L hoặc chữ U để liên kết 2 cạnh tường vuông góc. Bếp thẳng chữ I không có góc giao nên tuyệt đối không được bố trí khoang góc nối.',
+    type: 'CORNER_SHAPE_VALIDATION',
+    severity: 'ERROR', // Hard constraint
+    enabled: true,
+    weight: 25,
+    config: {},
+  },
+  {
     id: 'rule-tall-pantry-appliance-adjacent',
     code: 'RULE_09',
     name: 'Tủ đồ khô cao và Tủ thiết bị cao nên đặt cạnh nhau và đối diện tủ lạnh',

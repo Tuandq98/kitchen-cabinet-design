@@ -111,11 +111,20 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
 
   const handleShapeChange = (newShape: KitchenShape) => {
     setShape(newShape);
+    if (newShape === 'I') {
+      // Bếp chữ I không có góc nối, tự động loại bỏ K01
+      const currentCodes = shapePresets[newShape]?.selectedCodes || [];
+      const cleaned = currentCodes.filter((c) => c !== 'K01');
+      updateCurrentPreset({ selectedCodes: cleaned });
+    }
   };
 
   const toggleCode = (code: string) => {
     // 3 khoang trụ cột F01, S01, B01 là bắt buộc
     if (['F01', 'S01', 'B01'].includes(code)) return;
+    // Bếp chữ I không thể chọn khoang góc nối
+    if (shape === 'I' && code === 'K01') return;
+
     const nextCodes = selectedBaseCodes.includes(code)
       ? selectedBaseCodes.filter((c) => c !== code)
       : [...selectedBaseCodes, code];
@@ -134,7 +143,10 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
   };
 
   const handleSelectAll = () => {
-    updateCurrentPreset({ selectedCodes: baseCatalogModules.map((m) => m.code) });
+    const allCodes = baseCatalogModules
+      .filter((m) => shape !== 'I' || m.code !== 'K01')
+      .map((m) => m.code);
+    updateCurrentPreset({ selectedCodes: allCodes });
   };
 
   const handleStartDesign = () => {
@@ -452,34 +464,47 @@ export const KitchenSetupWizard: React.FC<KitchenSetupWizardProps> = ({
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {baseCatalogModules.map((mod) => {
-                const isSelected = selectedBaseCodes.includes(mod.code);
+                const isCornerDisabled =
+                  shape === 'I' && (mod.code === 'K01' || mod.category === 'corner');
+                const isSelected = !isCornerDisabled && selectedBaseCodes.includes(mod.code);
                 const isRequired = ['F01', 'S01', 'B01'].includes(mod.code);
 
                 return (
                   <div
                     key={mod.id}
-                    onClick={() => toggleCode(mod.code)}
-                    className={`p-2.5 rounded-xl border transition cursor-pointer flex items-start gap-2.5 ${
-                      isSelected
-                        ? 'bg-sky-500/10 border-sky-500/50 text-slate-100 shadow-sm'
-                        : 'bg-slate-950/40 border-slate-800/80 text-slate-400 hover:border-slate-700'
+                    onClick={() => {
+                      if (!isCornerDisabled) toggleCode(mod.code);
+                    }}
+                    className={`p-2.5 rounded-xl border transition flex items-start gap-2.5 ${
+                      isCornerDisabled
+                        ? 'opacity-40 bg-slate-950/20 border-slate-900 cursor-not-allowed'
+                        : isSelected
+                        ? 'bg-sky-500/10 border-sky-500/50 text-slate-100 shadow-sm cursor-pointer'
+                        : 'bg-slate-950/40 border-slate-800/80 text-slate-400 hover:border-slate-700 cursor-pointer'
                     }`}
                   >
                     <div className="mt-0.5 shrink-0">
-                      {isSelected ? (
+                      {isCornerDisabled ? (
+                        <Square className="w-4 h-4 text-slate-700" />
+                      ) : isSelected ? (
                         <CheckSquare2 className="w-4 h-4 text-sky-400" />
                       ) : (
                         <Square className="w-4 h-4 text-slate-600" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-0.5">
+                      <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                         <span className="font-mono font-bold text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-sky-300">
                           {mod.code}
                         </span>
                         {isRequired && (
                           <span className="text-[9px] font-bold text-rose-400 bg-rose-500/10 px-1 rounded">
                             Bắt buộc
+                          </span>
+                        )}
+                        {isCornerDisabled && (
+                          <span className="text-[9px] font-semibold text-amber-400/80 bg-amber-500/10 px-1 rounded border border-amber-500/20">
+                            Chỉ bếp L/U
                           </span>
                         )}
                       </div>

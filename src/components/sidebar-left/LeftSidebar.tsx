@@ -229,14 +229,22 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {filteredCatalog.map((mod) => {
               const defaultVar = mod.variants.find((v) => v.isDefault) || mod.variants[0];
+              const isCornerDisabledInShapeI =
+                layout.shape === 'I' && (mod.code === 'K01' || mod.category === 'corner');
+
               return (
                 <div
                   key={mod.id}
-                  draggable
+                  draggable={!isCornerDisabledInShapeI}
                   onDragStart={(e) => {
+                    if (isCornerDisabledInShapeI) return;
                     e.dataTransfer.setData('application/kitchen-module', mod.id);
                   }}
-                  className="bg-slate-950/70 border border-slate-800/80 hover:border-slate-700 rounded-xl p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition group relative overflow-hidden pl-3.5"
+                  className={`bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 transition group relative overflow-hidden pl-3.5 ${
+                    isCornerDisabledInShapeI
+                      ? 'opacity-50 cursor-not-allowed'
+                      : 'hover:border-slate-700 cursor-grab active:cursor-grabbing hover:shadow-md'
+                  }`}
                 >
                   {/* Dải màu nhận diện cạnh trái */}
                   <div
@@ -255,7 +263,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                         {getCategoryIcon(mod.category)}
                       </div>
                       <div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span
                             className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border"
                             style={{
@@ -269,6 +277,11 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                           <h4 className="text-xs font-semibold text-slate-200">
                             {mod.name}
                           </h4>
+                          {isCornerDisabledInShapeI && (
+                            <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1 rounded">
+                              Chỉ bếp L/U
+                            </span>
+                          )}
                         </div>
                         <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
                           {defaultVar ? `${defaultVar.width} × ${defaultVar.depth} × ${defaultVar.height} mm` : ''}
@@ -277,33 +290,39 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                     </div>
 
                     {/* Quick Add Menu */}
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => addModuleToEdge(mod.id, 'edge_A')}
-                        title="Thêm vào Cạnh A"
-                        className="p-1 bg-slate-800 hover:bg-sky-500 text-slate-300 hover:text-white rounded text-[10px] font-mono transition"
-                      >
-                        +A
-                      </button>
-                      {layout.shape !== 'I' && (
+                    {isCornerDisabledInShapeI ? (
+                      <span className="text-[9px] font-semibold text-amber-400/70 px-1 py-0.5">
+                        Không khả dụng
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-1">
                         <button
-                          onClick={() => addModuleToEdge(mod.id, 'edge_B')}
-                          title="Thêm vào Cạnh B"
+                          onClick={() => addModuleToEdge(mod.id, 'edge_A')}
+                          title="Thêm vào Cạnh A"
                           className="p-1 bg-slate-800 hover:bg-sky-500 text-slate-300 hover:text-white rounded text-[10px] font-mono transition"
                         >
-                          +B
+                          +A
                         </button>
-                      )}
-                      {layout.shape === 'U' && (
-                        <button
-                          onClick={() => addModuleToEdge(mod.id, 'edge_C')}
-                          title="Thêm vào Cạnh C"
-                          className="p-1 bg-slate-800 hover:bg-sky-500 text-slate-300 hover:text-white rounded text-[10px] font-mono transition"
-                        >
-                          +C
-                        </button>
-                      )}
-                    </div>
+                        {layout.shape !== 'I' && (
+                          <button
+                            onClick={() => addModuleToEdge(mod.id, 'edge_B')}
+                            title="Thêm vào Cạnh B"
+                            className="p-1 bg-slate-800 hover:bg-sky-500 text-slate-300 hover:text-white rounded text-[10px] font-mono transition"
+                          >
+                            +B
+                          </button>
+                        )}
+                        {layout.shape === 'U' && (
+                          <button
+                            onClick={() => addModuleToEdge(mod.id, 'edge_C')}
+                            title="Thêm vào Cạnh C"
+                            className="p-1 bg-slate-800 hover:bg-sky-500 text-slate-300 hover:text-white rounded text-[10px] font-mono transition"
+                          >
+                            +C
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Biến thể kích thước */}
@@ -501,6 +520,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                     'RULE_06',
                     'RULE_07',
                     'RULE_08',
+                    'RULE_10',
                   ].includes(r.code)
                 )
                 .map((rule) => (
@@ -703,6 +723,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   'RULE_06',
                   'RULE_07',
                   'RULE_08',
+                  'RULE_10',
                   'RULE_09',
                   'RULE_05',
                   'RULE_03',
@@ -732,6 +753,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                         'RULE_06',
                         'RULE_07',
                         'RULE_08',
+                        'RULE_10',
                         'RULE_09',
                         'RULE_05',
                         'RULE_03',

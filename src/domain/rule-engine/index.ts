@@ -95,6 +95,10 @@ export class RuleEngine {
           this.checkTallPantryApplianceAdjacent(layout, rule, violations);
           break;
 
+        case 'CORNER_SHAPE_VALIDATION':
+          this.checkCornerShapeValidation(layout, rule, violations);
+          break;
+
         case 'UPPER_MAX_STORAGE_WIDTH':
           this.checkUpperMaxStorageWidth(layout, rule, violations);
           break;
@@ -847,6 +851,34 @@ export class RuleEngine {
             involvedModuleIds: [f01.instanceId, ...tallCodesInvolved],
           });
         }
+      }
+    }
+  }
+
+  private checkCornerShapeValidation(
+    layout: KitchenLayout,
+    rule: DesignRule,
+    violations: RuleViolation[]
+  ): void {
+    if (layout.shape === 'I') {
+      const allModules = [
+        ...(layout.placedModules || []),
+        ...(layout.placedUpperModules || []),
+      ];
+      const invalidCornerMods = allModules.filter(
+        (m) => m.code === 'K01' || m.category === 'corner'
+      );
+
+      for (const cm of invalidCornerMods) {
+        violations.push({
+          ruleId: rule.id,
+          ruleCode: rule.code,
+          ruleName: rule.name,
+          severity: rule.severity,
+          message: `Khoang góc nối "${cm.name}" (${cm.code}) không thể sử dụng trong bếp thẳng chữ I.`,
+          recommendation: `Khoang góc nối chỉ được sinh ra và sử dụng khi làm bếp chữ L và chữ U để kết nối 2 cạnh vuông góc. Vui lòng xóa khoang này khỏi thiết kế bếp chữ I hoặc chuyển kiểu dáng bếp sang chữ L/chữ U.`,
+          involvedModuleIds: [cm.instanceId],
+        });
       }
     }
   }
