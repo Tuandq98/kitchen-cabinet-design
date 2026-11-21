@@ -807,32 +807,107 @@ function createErgonomicFallbackModules(
     return placed;
   }
 
-  if (shape === 'L') {
-    const bCodes: string[] = [];
-    const aCodes: string[] = [];
+  if (shape === 'L' && edgeB) {
+    const availA = orientAB === 'edge_A' ? edgeA.length - wBaseAB : edgeA.length - depthB;
+    const availB = orientAB === 'edge_B' ? edgeB.length - wBaseAB : edgeB.length - depthA;
 
+    // Phân chia khoang công năng hợp lý giữa Cạnh A và Cạnh B
+    let bCodes: string[] = [];
+    let aCodes: string[] = [];
+
+    // Ưu tiên 1: Cụm tủ cao (F01, P01, A01) quy tụ ở Cạnh B, Khu chuẩn bị & Nấu ở Cạnh A
     for (const code of codesToPlace) {
-      if (code === 'F01') {
+      if (['F01', 'P01', 'A01'].includes(code)) {
         bCodes.push(code);
-      } else {
+      } else if (['S01', 'W01', 'C01', 'B01', 'SP01'].includes(code)) {
         aCodes.push(code);
+      } else if (code === 'D01' || code === 'M01') {
+        if (bCodes.length <= 3) {
+          bCodes.unshift(code);
+        } else {
+          aCodes.push(code);
+        }
+      } else {
+        // T01, R01...
+        if (bCodes.length < aCodes.length) {
+          bCodes.unshift(code);
+        } else {
+          aCodes.push(code);
+        }
       }
     }
 
-    const orderA: Record<string, number> = {
-      C01: 1,
-      S01: 2,
-      W01: 3,
-      D01: 4,
-      T01: 5,
-      B01: 6,
-      SP01: 7,
-      R01: 8,
-      M01: 9,
-      P01: 10,
-      A01: 11,
+    const calcMinSum = (codes: string[]) =>
+      codes.reduce((sum, c) => {
+        const item = getModAndVariant(c);
+        if (!item) return sum;
+        const minW = item.mod.minWidth || Math.min(...item.mod.variants.map((v) => v.width));
+        return sum + minW;
+      }, 0);
+
+    // Cân bằng động theo năng lực 2 cạnh
+    const movableToB = ['D01', 'M01', 'R01', 'T01', 'SP01'];
+    while (calcMinSum(aCodes) > availA && aCodes.length > 2) {
+      const idx = aCodes.findIndex((c) => movableToB.includes(c));
+      if (idx === -1) break;
+      const [moved] = aCodes.splice(idx, 1);
+      bCodes.unshift(moved);
+    }
+
+    const movableToA = ['D01', 'M01', 'R01', 'T01', 'SP01'];
+    while (calcMinSum(bCodes) > availB && bCodes.length > 2) {
+      const idx = bCodes.findIndex((c) => movableToA.includes(c));
+      if (idx === -1) break;
+      const [moved] = bCodes.splice(idx, 1);
+      aCodes.push(moved);
+    }
+
+    // Tỉa khoang nếu tổng kích thước vẫn vượt chiều dài
+    const dropPriority = ['T01', 'R01', 'M01', 'P01', 'A01', 'W01', 'D01'];
+    while (calcMinSum(aCodes) > availA && aCodes.length > 2) {
+      const idx = aCodes.findIndex((c) => dropPriority.includes(c));
+      if (idx === -1) break;
+      aCodes.splice(idx, 1);
+    }
+    while (calcMinSum(bCodes) > availB && bCodes.length > 2) {
+      const idx = bCodes.findIndex((c) => dropPriority.includes(c));
+      if (idx === -1) break;
+      bCodes.splice(dropIdxSafe(bCodes, dropPriority), 1);
+    }
+
+    // Sắp xếp Cạnh B: từ góc xuống mép ngoài cùng (F01 hoặc P01, A01 ở mép ngoài)
+    const orderB: Record<string, number> = {
+      C01: 10,
+      S01: 20,
+      W01: 30,
+      D01: 40,
+      R01: 50,
+      B01: 60,
+      SP01: 70,
+      M01: 80,
+      T01: 90,
+      P01: 150,
+      A01: 160,
+      F01: 170,
     };
-    aCodes.sort((a, b) => (orderA[a] ?? 99) - (orderA[b] ?? 99));
+    bCodes.sort((a, b) => (orderB[a] ?? 100) - (orderB[b] ?? 100));
+
+    // Sắp xếp Cạnh A: từ góc sang mép ngoài cùng
+    const orderA: Record<string, number> = {
+      C01: 10,
+      S01: 20,
+      W01: 30,
+      D01: 40,
+      T01: 50,
+      R01: 60,
+      B01: 70,
+      SP01: 80,
+      M01: 90,
+      P01: 150,
+      A01: 160,
+      F01: 170,
+    };
+    aCodes.sort((a, b) => (orderA[a] ?? 100) - (orderA[b] ?? 100));
 
     let curB = orientAB === 'edge_B' ? wBaseAB : depthA;
     bCodes.forEach((code, idx) => {
@@ -881,6 +956,14 @@ function createErgonomicFallbackModules(
     });
 
     return placed;
+  }
+
+  function dropIdxSafe(arr: string[], priority: string[]): number {
+    for (const p of priority) {
+      const idx = arr.findIndex((c) => c === p);
+      if (idx !== -1) return idx;
+    }
+    return arr.length - 1;
   }
 
   // Chữ I:
@@ -1318,7 +1401,19 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
           targetLayout.placedModules.length > 0 &&
           targetLayout.placedModules.every((m) => m.edgeId === 'edge_A');
 
-        if (!isBrokenU) {
+        const isBrokenL =
+          newShape === 'L' &&
+          targetLayout.placedModules.length > 0 &&
+          (targetLayout.placedModules.filter((m) => m.edgeId === 'edge_B').length <= 1 &&
+           targetLayout.placedModules.filter((m) => m.edgeId === 'edge_A').length >= 5);
+
+        // Đánh giá kiểm tra nếu bản vẽ cũ bị vi phạm lỗi tràn cạnh nghiêm trọng thì tái cấu trúc lại
+        const checkRep = ruleEngineInstance.evaluate(targetLayout, state.catalog, targetLayout.designPhase);
+        const hasOverflow = checkRep.violations.some(
+          (v) => v.ruleCode === 'RULE_03' || v.message.includes('tràn kích thước')
+        );
+
+        if (!isBrokenU && !isBrokenL && !hasOverflow) {
           if (newShape === 'I') {
             targetLayout = {
               ...targetLayout,

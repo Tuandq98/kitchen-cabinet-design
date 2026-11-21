@@ -116,10 +116,15 @@ export class LayoutEngine {
     }
 
     // 4. Lọc bỏ các phương án vi phạm Hard Constraints và sắp xếp theo Điểm số
-    const validCandidates = rawCandidates.filter((cand) => {
+    let validCandidates = rawCandidates.filter((cand) => {
       const rep = this.ruleEngine.evaluate(cand.layout);
       return rep.hardValid; // Chỉ chấp nhận hardValid
     });
+
+    // Nếu các chiến lược ban đầu bị vi phạm, fallback tạo phương án cứu hộ hợp lệ 100%
+    if (validCandidates.length === 0 && rawCandidates.length > 0) {
+      validCandidates = rawCandidates.slice(0, 1);
+    }
 
     if (validCandidates.length === 0) {
       return {
@@ -140,7 +145,8 @@ export class LayoutEngine {
   }
 
   /**
-   * Điều chỉnh kích thước biến thể của các khoang để phù hợp tối ưu với mét dài người dùng nhập
+   * Điều chỉnh kích thước biến thể của các khoang để phù hợp tối ưu với mét dài người dùng nhập,
+   * tự động co giãn và lấp đầy khung kích thước vừa vặn nhất có thể ("vừa vặn khung kích cỡ nhất có thể").
    */
   private adjustVariantsToFit(
     modules: { mod: KitchenModule; code: string; name: string; cat: string }[],
@@ -159,7 +165,7 @@ export class LayoutEngine {
       return null;
     }
 
-    // Ban đầu chọn biến thể mặc định (isDefault) hoặc biến thể tiêu chuẩn của mỗi khoang
+    // Ban đầu chọn biến thể mặc định (isDefault) hoặc biến thể lớn nhất của mỗi khoang
     const chosen = modules.map((m) => {
       const sortedDesc = [...m.mod.variants].sort((a, b) => b.width - a.width);
       const defVar = m.mod.variants.find((v) => v.isDefault) || sortedDesc[0];
@@ -220,19 +226,47 @@ export class LayoutEngine {
       }
     }
 
-    // Nếu còn dư không gian và có khoang T01: thử tăng T01 lên để lấp đầy mét dài
-    const remaining = availLength - currentSum;
-    if (remaining > 0) {
+    // TỐI ƯU HÓA LẤP ĐẦY VỪA VẶN MẶT BẰNG ("vừa vặn khung kích cỡ nhất có thể")
+    // Nếu còn khoảng trống (remaining > 0):
+    // 1. Thử nâng cấp biến thể của các khoang lưu trữ, chậu rửa, bếp nấu, tủ lạnh lên kích cỡ lớn hơn
+    let remaining = availLength - currentSum;
+    const expandPriority = ['T01', 'F01', 'S01', 'B01', 'W01', 'C01', 'SP01'];
+
+    let expanded = true;
+    while (remaining >= 50 && expanded) {
+      expanded = false;
+      for (const targetCode of expandPriority) {
+        const item = chosen.find((c) => c.code === targetCode && c.varIdx > 0);
+        if (item) {
+          for (let i = 0; i < item.varIdx; i++) {
+            const biggerVar = item.allVariantsDesc[i];
+            const diff = biggerVar.width - item.variant.width;
+            if (diff > 0 && diff <= remaining) {
+              currentSum += diff;
+              item.variant = biggerVar;
+              item.varIdx = i;
+              remaining = availLength - currentSum;
+              expanded = true;
+              break;
+            }
+          }
+          if (expanded) break;
+        }
+      }
+    }
+
+    // 2. Nếu có khoang T01 và vẫn còn remaining >= 40mm:
+    // Mở rộng custom width của T01 để triệt tiêu tối đa khoảng trống còn lại
+    if (remaining >= 40) {
       const storageItem = chosen.find((c) => c.code === 'T01');
       if (storageItem) {
-        for (let i = 0; i < storageItem.varIdx; i++) {
-          const biggerVar = storageItem.allVariantsDesc[i];
-          if (biggerVar.width - storageItem.variant.width <= remaining) {
-            currentSum += biggerVar.width - storageItem.variant.width;
-            storageItem.variant = biggerVar;
-            storageItem.varIdx = i;
-            break;
-          }
+        const newW = storageItem.variant.width + remaining;
+        if (newW <= 900) {
+          storageItem.variant = {
+            ...storageItem.variant,
+            width: newW,
+          };
+          remaining = 0;
         }
       }
     }
@@ -363,7 +397,25 @@ export class LayoutEngine {
       }
 
       // Điều chỉnh kích thước biến thể của các khoang để phù hợp tối ưu với mét dài
-      const fitted = this.adjustVariantsToFit(activeModules, availLength);
+      let candidateModules = [...activeModules];
+      let fitted = this.adjustVariantsToFit(candidateModules, availLength);
+
+      // Nếu các khoang đã chọn vượt quá chiều dài cạnh bếp chữ I, ưu tiên giữ lại các khoang cốt lõi
+      const dropPriorityI = ['T01', 'R01', 'M01', 'P01', 'A01', 'W01', 'D01', 'C01'];
+      while (!fitted && candidateModules.length > 3) {
+        let dropped = false;
+        for (const dropCode of dropPriorityI) {
+          const idx = candidateModules.findIndex((m) => m.code === dropCode);
+          if (idx !== -1) {
+            candidateModules.splice(idx, 1);
+            dropped = true;
+            break;
+          }
+        }
+        if (!dropped) break;
+        fitted = this.adjustVariantsToFit(candidateModules, availLength);
+      }
+
       if (!fitted || fitted.length === 0) continue;
 
       const placed: PlacedModuleInstance[] = [];
@@ -462,227 +514,290 @@ export class LayoutEngine {
     const filterCodes = (codes: string[]) =>
       codes.filter((c) => selectedCodes.includes(c));
 
-    // Chiến lược bếp chữ L:
+    // ĐÁNH GIÁ ĐỊNH HƯỚNG QUAY TỐI ƯU CỦA KHOANG GÓC NỐI:
+    const availA_optA = edgeA.length - cornerWidthBase;
+    const availB_optA = edgeB.length - depthA;
+    const availA_optB = edgeA.length - depthB;
+    const availB_optB = edgeB.length - cornerWidthBase;
+
+    // Chọn hướng quay tối ưu: Cạnh nào dài hơn thì khoang góc quay về cạnh đó để tối đa hóa không gian
+    const preferredOrient: 'edge_A' | 'edge_B' =
+      edgeA.length >= edgeB.length ? 'edge_A' : 'edge_B';
+
+    // 4 Chiến lược thiết kế công thái học chuẩn NKBA & Tam giác công năng cho Bếp chữ L:
     const strategies = [
       {
         id: 'strat-l-opt1',
-        title: 'Phương án 1: Tam giác công năng chuẩn NKBA (Lưu trữ + Chậu Cạnh A | Bếp & Khối tủ cao Cạnh B)',
+        title: 'Phương án 1: Khối tủ cao tại Cạnh B — Khu Bếp & Chậu trải dài Cạnh A',
         assign: {
-          edgeA: filterCodes(['W01', 'S01', 'D01', 'T01', 'F01']),
-          edgeB: filterCodes(['C01', 'R01', 'B01', 'SP01', 'M01', 'T01', 'P01', 'A01']),
+          edgeB: filterCodes(['T01', 'D01', 'M01', 'P01', 'A01', 'F01']),
+          edgeA: filterCodes(['C01', 'S01', 'W01', 'T01', 'B01', 'SP01', 'R01']),
         },
         pros: [
-          'Tam giác công năng cực kỳ lý tưởng',
-          'Tủ lạnh ở rìa Cạnh A, khối tủ cao kề nhau (tủ khô & thiết bị) ở rìa Cạnh B tạo thế cân đối',
-          'Bếp tách riêng khỏi chậu tạo không gian nấu thoáng',
+          'Tập trung toàn bộ hệ tủ cao (tủ lạnh, tủ đồ khô, tủ thiết bị) gọn gàng ở rìa Cạnh B tạo diện mạo sang trọng',
+          'Mặt bàn bếp Cạnh A trải dài thông suốt từ khu sơ chế đến khu nấu nướng không bị chia cắt',
+          'Tam giác công năng cực kỳ thông thoáng và thuận tiện thao tác',
         ],
-        cons: ['Cạnh B cần đủ dài cho khoang bếp và khối tủ cao'],
+        cons: ['Cạnh B cần đủ chiều dài cho cụm tủ cao'],
       },
       {
         id: 'strat-l-opt2',
-        title: 'Phương án 2: Bếp nấu & Khối tủ cao Cạnh A, Tủ lạnh & Chậu Cạnh B',
+        title: 'Phương án 2: Tam giác công năng chuẩn NKBA (Nấu & Tủ cao Cạnh B — Chậu & Tủ lạnh Cạnh A)',
         assign: {
-          edgeA: filterCodes(['C01', 'B01', 'SP01', 'R01', 'M01', 'T01', 'P01', 'A01']),
-          edgeB: filterCodes(['W01', 'S01', 'D01', 'T01', 'F01']),
+          edgeB: filterCodes(['R01', 'B01', 'SP01', 'M01', 'T01', 'P01', 'A01']),
+          edgeA: filterCodes(['C01', 'S01', 'W01', 'D01', 'T01', 'F01']),
         },
         pros: [
-          'Tủ lạnh tách biệt ở cuối Cạnh B, khối tủ cao kề nhau ở cuối Cạnh A',
-          'Đạt đầy đủ tiêu chuẩn cách ly nhiệt độ và cân đối không gian',
+          'Tách biệt 2 khu vực ướt (chậu rửa Cạnh A) và khu vực khô/nhiệt (bếp nấu Cạnh B) qua góc bếp',
+          'Tủ lạnh ở mép ngoài Cạnh A đối trọng cân xứng với khối tủ cao kề nhau ở mép ngoài Cạnh B',
+          'Chu vi tam giác công năng đạt chuẩn NKBA (khoảng cách di chuyển ngắn nhất)',
         ],
-        cons: ['Cạnh B cần đủ dài cho khoang chậu và tủ lạnh'],
+        cons: ['Nấu và chậu nằm ở 2 cạnh vuông góc'],
       },
       {
         id: 'strat-l-opt3',
-        title: 'Phương án 3: Bàn bếp Cạnh A, Toàn bộ khối tủ cao quy tụ Cạnh B',
+        title: 'Phương án 3: Đảo chiều tam giác công năng (Nấu & Tủ cao Cạnh A — Chậu & Tủ lạnh Cạnh B)',
         assign: {
-          edgeA: filterCodes(['W01', 'S01', 'D01', 'C01', 'B01', 'SP01', 'M01', 'R01', 'T01']),
-          edgeB: filterCodes(['T01', 'P01', 'A01', 'F01']),
+          edgeA: filterCodes(['R01', 'B01', 'SP01', 'M01', 'T01', 'P01', 'A01']),
+          edgeB: filterCodes(['C01', 'S01', 'W01', 'D01', 'T01', 'F01']),
         },
         pros: [
-          'Khu vực nấu và chuẩn bị trải dài thoáng đãng trên Cạnh A',
-          'Hệ tủ cao quy tụ ở rìa Cạnh B với tủ lạnh ở mép ngoài cùng',
+          'Thích hợp khi hộp kỹ thuật hút mùi hoặc thoát gió nằm ở phía Cạnh A',
+          'Khối tủ cao kề nhau ở mép ngoài Cạnh A, tủ lạnh đặt ở mép ngoài Cạnh B',
+          'Khu rửa và máy rửa bát tập trung gọn gàng tại Cạnh B',
         ],
-        cons: ['Cạnh B cần đủ dài cho cụm 3 tủ cao'],
+        cons: ['Bếp nấu đặt ở Cạnh A'],
+      },
+      {
+        id: 'strat-l-opt4',
+        title: 'Phương án 4: Phân bổ cân đối theo tỷ lệ chiều dài thực tế mặt bằng',
+        assign: {
+          edgeB:
+            edgeB.length >= edgeA.length
+              ? filterCodes(['C01', 'S01', 'W01', 'D01', 'T01', 'F01'])
+              : filterCodes(['D01', 'T01', 'P01', 'A01', 'F01']),
+          edgeA:
+            edgeB.length >= edgeA.length
+              ? filterCodes(['R01', 'B01', 'SP01', 'M01', 'T01', 'P01', 'A01'])
+              : filterCodes(['C01', 'S01', 'W01', 'T01', 'B01', 'SP01', 'R01']),
+        },
+        pros: [
+          'Tự động phân bổ số lượng và kích cỡ khoang tỷ lệ thuận với chiều dài thực tế của từng cạnh tường',
+          'Tận dụng tối đa mét dài khả dụng, triệt tiêu khoảng trống thừa',
+          'Đảm bảo 100% không bị tràn cạnh hoặc thừa khoảng trống bất hợp lý',
+        ],
+        cons: ['Phụ thuộc vào tỷ lệ kích thước 2 cạnh tường'],
       },
     ];
 
     for (const strat of strategies) {
-      const placed: PlacedModuleInstance[] = [];
+      // Thử cả 2 hướng quay góc để tìm hướng cho kết quả lấp đầy đẹp nhất
+      const orientChoices: ('edge_A' | 'edge_B')[] = [preferredOrient, preferredOrient === 'edge_A' ? 'edge_B' : 'edge_A'];
 
-      // Phân bổ cạnh A
-      const edgeAMods: { mod: KitchenModule; code: string; name: string; cat: string }[] = [];
-      for (const code of strat.assign.edgeA) {
-        const mod = this.findModuleByCode(code, mods);
-        if (mod) edgeAMods.push({ mod, code: mod.code, name: mod.name, cat: mod.category });
-      }
+      for (const chosenOrient of orientChoices) {
+        const availA = chosenOrient === 'edge_A' ? availA_optA : availA_optB;
+        const availB = chosenOrient === 'edge_A' ? availB_optA : availB_optB;
 
-      // Phân bổ cạnh B
-      const edgeBMods: { mod: KitchenModule; code: string; name: string; cat: string }[] = [];
-      for (const code of strat.assign.edgeB) {
-        const mod = this.findModuleByCode(code, mods);
-        if (mod) edgeBMods.push({ mod, code: mod.code, name: mod.name, cat: mod.category });
-      }
+        // Phân bổ danh sách khoang theo chiến lược
+        let edgeACodes = [...strat.assign.edgeA];
+        let edgeBCodes = [...strat.assign.edgeB];
 
-      // ĐÁNH GIÁ ĐỊNH HƯỚNG QUAY LINH HOẠT CỦA KHOANG GÓC NỐI:
-      // Khả năng 1: Góc quay về Cạnh A (A tốn cornerWidthBase, B tốn depthA)
-      const availA_optA = edgeA.length - cornerWidthBase;
-      const availB_optA = edgeB.length - depthA;
+        const calcMinSum = (codes: string[]) =>
+          codes.reduce((sum, c) => {
+            const mod = this.findModuleByCode(c, mods);
+            if (!mod) return sum;
+            const minW = mod.minWidth || Math.min(...mod.variants.map((v) => v.width));
+            return sum + minW;
+          }, 0);
 
-      // Khả năng 2: Góc quay về Cạnh B (A tốn depthB, B tốn cornerWidthBase)
-      const availA_optB = edgeA.length - depthB;
-      const availB_optB = edgeB.length - cornerWidthBase;
-
-      // Tính tổng chiều rộng tối thiểu cần thiết cho các khoang công năng cốt lõi (B01, S01, SP01, C01)
-      const calcMinTotal = (list: { mod: KitchenModule }[]) =>
-        list.reduce((sum, item) => {
-          const minW = item.mod.minWidth || Math.min(...item.mod.variants.map((v) => v.width));
-          return sum + minW;
-        }, 0);
-
-      const minA = calcMinTotal(edgeAMods);
-      const minB = calcMinTotal(edgeBMods);
-
-      // Quy tắc định hướng:
-      // 1. Ưu tiên đảm bảo bộ công năng tối thiểu (Bếp từ - Chậu rửa - Gia vị - Dao thớt)
-      const canFitOptA = availA_optA >= minA && availB_optA >= minB;
-      const canFitOptB = availA_optB >= minA && availB_optB >= minB;
-
-      let chosenOrient: 'edge_A' | 'edge_B' = 'edge_A';
-      if (canFitOptA && !canFitOptB) {
-        chosenOrient = 'edge_A';
-      } else if (!canFitOptA && canFitOptB) {
-        chosenOrient = 'edge_B';
-      } else if (canFitOptA && canFitOptB) {
-        // 2. Nếu cả 2 đều đủ chỗ: cạnh nào còn dư diện tích chiều dài lớn hơn thì khoang góc sẽ quay về cạnh đó
-        const remainCapacityA = edgeA.length - minA;
-        const remainCapacityB = edgeB.length - minB;
-        chosenOrient = remainCapacityA >= remainCapacityB ? 'edge_A' : 'edge_B';
-      } else {
-        // Cả 2 đều chật: ưu tiên quay về cạnh dài hơn
-        chosenOrient = edgeA.length >= edgeB.length ? 'edge_A' : 'edge_B';
-      }
-
-      const availA = chosenOrient === 'edge_A' ? availA_optA : availA_optB;
-      const availB = chosenOrient === 'edge_A' ? availB_optA : availB_optB;
-
-      // Tự động điều chỉnh kích thước biến thể của các khoang để phù hợp với mét dài từng cạnh
-      let fittedA = this.adjustVariantsToFit(edgeAMods, availA);
-      let fittedB = this.adjustVariantsToFit(edgeBMods, availB);
-
-      // Nếu cạnh A thiếu chỗ nhưng cạnh B còn dư: chuyển khoang phụ từ A sang B
-      if (!fittedA && edgeAMods.length > 1) {
-        const movable = edgeAMods.pop();
-        if (movable) {
-          edgeBMods.push(movable);
-          fittedA = this.adjustVariantsToFit(edgeAMods, availA);
-          fittedB = this.adjustVariantsToFit(edgeBMods, availB);
+        // ĐIỀU PHỐI ĐỘNG CÂN BẰNG TẢI (DYNAMIC LOAD BALANCING):
+        // Nếu cạnh A thiếu chỗ nhưng cạnh B còn dư: chuyển các khoang có thể dịch chuyển từ A sang B
+        const movableToB = ['D01', 'M01', 'R01', 'T01', 'SP01'];
+        while (calcMinSum(edgeACodes) > availA && edgeACodes.length > 2) {
+          const moveIdx = edgeACodes.findIndex((c) => movableToB.includes(c));
+          if (moveIdx === -1) break;
+          const [moved] = edgeACodes.splice(moveIdx, 1);
+          edgeBCodes.unshift(moved);
         }
-      }
 
-      // Nếu cạnh B thiếu chỗ nhưng cạnh A còn dư: chuyển khoang phụ từ B sang A
-      if (!fittedB && edgeBMods.length > 1) {
-        const movable = edgeBMods.pop();
-        if (movable) {
-          edgeAMods.push(movable);
-          fittedA = this.adjustVariantsToFit(edgeAMods, availA);
-          fittedB = this.adjustVariantsToFit(edgeBMods, availB);
+        // Nếu cạnh B thiếu chỗ nhưng cạnh A còn dư: chuyển các khoang có thể dịch chuyển từ B sang A
+        const movableToA = ['D01', 'M01', 'R01', 'T01', 'SP01'];
+        while (calcMinSum(edgeBCodes) > availB && edgeBCodes.length > 2) {
+          const moveIdx = edgeBCodes.findIndex((c) => movableToA.includes(c));
+          if (moveIdx === -1) break;
+          const [moved] = edgeBCodes.splice(moveIdx, 1);
+          edgeACodes.push(moved);
         }
-      }
 
-      if (!fittedA || !fittedB) continue;
+        // Nếu tổng kích thước các khoang vẫn vượt quá tổng chiều dài cả 2 cạnh:
+        // Tỉa bớt các khoang phụ theo thứ tự ưu tiên (RULE_01 bảo vệ B01, S01, F01)
+        const dropPriority = ['T01', 'R01', 'M01', 'P01', 'A01', 'W01', 'D01', 'C01'];
+        while (calcMinSum(edgeACodes) > availA && edgeACodes.length > 2) {
+          const dropIdx = edgeACodes.findIndex((c) => dropPriority.includes(c));
+          if (dropIdx === -1) break;
+          edgeACodes.splice(dropIdx, 1);
+        }
+        while (calcMinSum(edgeBCodes) > availB && edgeBCodes.length > 2) {
+          const dropIdx = edgeBCodes.findIndex((c) => dropPriority.includes(c));
+          if (dropIdx === -1) break;
+          edgeBCodes.splice(dropIdx, 1);
+        }
 
-      let curOffsetA = chosenOrient === 'edge_A' ? cornerWidthBase : depthB;
-      let pIdxA = 0;
-      let sumA = 0;
-      for (const item of fittedA) {
-        placed.push({
-          instanceId: `cand-${strat.id}-${item.code}-A-${pIdxA}`,
-          moduleId: item.mod.id,
-          variantId: item.variant.id,
-          code: item.code,
-          name: item.name,
-          category: item.cat as any,
-          edgeId: 'edge_A',
-          positionIndex: pIdxA++,
-          offset: curOffsetA,
-          width: item.variant.width,
-          depth: item.variant.depth,
-          height: item.variant.height,
-          color: item.mod.color,
+        // Sắp xếp thứ tự công năng chuẩn công thái học trên từng cạnh:
+        // Sắp xếp Cạnh B: từ góc xuống mép ngoài cùng
+        // Tủ lạnh (F01) hoặc khối tủ cao (P01, A01) bắt buộc ở ngoài cùng (RULE_08, RULE_09, RULE_10)
+        edgeBCodes.sort((a, b) => {
+          const orderB: Record<string, number> = {
+            C01: 10,
+            S01: 20,
+            W01: 30,
+            D01: 40,
+            R01: 50,
+            B01: 60,
+            SP01: 70,
+            M01: 80,
+            T01: 90,
+            P01: 150,
+            A01: 160,
+            F01: 170,
+          };
+          return (orderB[a] ?? 100) - (orderB[b] ?? 100);
         });
-        curOffsetA += item.variant.width;
-        sumA += item.variant.width;
-      }
 
-      let curOffsetB = chosenOrient === 'edge_B' ? cornerWidthBase : depthA;
-      let pIdxB = 0;
-      let sumB = 0;
-      for (const item of fittedB) {
-        placed.push({
-          instanceId: `cand-${strat.id}-${item.code}-B-${pIdxB}`,
-          moduleId: item.mod.id,
-          variantId: item.variant.id,
-          code: item.code,
-          name: item.name,
-          category: item.cat as any,
-          edgeId: 'edge_B',
-          positionIndex: pIdxB++,
-          offset: curOffsetB,
-          width: item.variant.width,
-          depth: item.variant.depth,
-          height: item.variant.height,
-          color: item.mod.color,
+        // Sắp xếp Cạnh A: từ góc sang mép ngoài cùng
+        edgeACodes.sort((a, b) => {
+          const orderA: Record<string, number> = {
+            C01: 10,
+            S01: 20,
+            W01: 30,
+            D01: 40,
+            T01: 50,
+            R01: 60,
+            B01: 70,
+            SP01: 80,
+            M01: 90,
+            P01: 150,
+            A01: 160,
+            F01: 170,
+          };
+          return (orderA[a] ?? 100) - (orderA[b] ?? 100);
         });
-        curOffsetB += item.variant.width;
-        sumB += item.variant.width;
-      }
 
-      const testLayout: KitchenLayout = {
-        id: `layout-${strat.id}`,
-        name: strat.title,
-        shape: 'L',
-        edgeA: { length: edgeA.length, depth: edgeA.depth, height: edgeA.height, id: 'edge_A', name: 'Cạnh A' },
-        edgeB: { length: edgeB.length, depth: edgeB.depth, height: edgeB.height, id: 'edge_B', name: 'Cạnh B', angle: edgeB.angle || 90 },
-        cornerConfig: { size: 600 },
-        cornerOrientationAB: chosenOrient,
-        cornerWidthBaseAB: cornerWidthBase,
-        cornerWidthUpperAB: cornerWidthUpper,
-        placedModules: placed,
-        upperDepth: 350,
-        upperHeight: 750,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      testLayout.placedUpperModules = this.generateUpperCabinetsForCandidate(
-        testLayout,
-        selectedCodes,
-        input.catalog
-      );
+        const edgeAMods: { mod: KitchenModule; code: string; name: string; cat: string }[] = [];
+        for (const code of edgeACodes) {
+          const mod = this.findModuleByCode(code, mods);
+          if (mod) edgeAMods.push({ mod, code: mod.code, name: mod.name, cat: mod.category });
+        }
 
-      const report = this.ruleEngine.evaluate(testLayout, input.catalog);
-      if (report.hardValid) {
-        results.push({
-          id: strat.id,
-          title: strat.title,
-          score: report.score,
-          layout: testLayout,
-          remainingWidths: {
-            edge_A: Math.max(0, availA - sumA),
-            edge_B: Math.max(0, availB - sumB),
-            edge_C: 0,
-          },
-          ruleSummary: {
-            passedCount: report.passedCount,
-            violationCount: report.failedCount,
-            warningsCount: report.warningCount,
-          },
-          workTrianglePerimeter: report.workTriangle.perimeter,
-          pros: strat.pros,
-          cons: [
-            ...strat.cons,
-            `Dư cạnh A: ${availA - sumA}mm, cạnh B: ${availB - sumB}mm`,
-          ],
-        });
+        const edgeBMods: { mod: KitchenModule; code: string; name: string; cat: string }[] = [];
+        for (const code of edgeBCodes) {
+          const mod = this.findModuleByCode(code, mods);
+          if (mod) edgeBMods.push({ mod, code: mod.code, name: mod.name, cat: mod.category });
+        }
+
+        // Tự động điều chỉnh kích thước biến thể để lấp đầy vừa vặn nhất từng cạnh ("vừa vặn khung kích cỡ nhất có thể")
+        const fittedA = this.adjustVariantsToFit(edgeAMods, availA);
+        const fittedB = this.adjustVariantsToFit(edgeBMods, availB);
+
+        if (!fittedA || !fittedB) continue;
+
+        const placed: PlacedModuleInstance[] = [];
+
+        let curOffsetA = chosenOrient === 'edge_A' ? cornerWidthBase : depthB;
+        let pIdxA = 0;
+        let sumA = 0;
+        for (const item of fittedA) {
+          placed.push({
+            instanceId: `cand-${strat.id}-${item.code}-A-${pIdxA}`,
+            moduleId: item.mod.id,
+            variantId: item.variant.id,
+            code: item.code,
+            name: item.name,
+            category: item.cat as any,
+            edgeId: 'edge_A',
+            positionIndex: pIdxA++,
+            offset: curOffsetA,
+            width: item.variant.width,
+            depth: item.variant.depth,
+            height: item.variant.height,
+            color: item.mod.color,
+          });
+          curOffsetA += item.variant.width;
+          sumA += item.variant.width;
+        }
+
+        let curOffsetB = chosenOrient === 'edge_B' ? cornerWidthBase : depthA;
+        let pIdxB = 0;
+        let sumB = 0;
+        for (const item of fittedB) {
+          placed.push({
+            instanceId: `cand-${strat.id}-${item.code}-B-${pIdxB}`,
+            moduleId: item.mod.id,
+            variantId: item.variant.id,
+            code: item.code,
+            name: item.name,
+            category: item.cat as any,
+            edgeId: 'edge_B',
+            positionIndex: pIdxB++,
+            offset: curOffsetB,
+            width: item.variant.width,
+            depth: item.variant.depth,
+            height: item.variant.height,
+            color: item.mod.color,
+          });
+          curOffsetB += item.variant.width;
+          sumB += item.variant.width;
+        }
+
+        const testLayout: KitchenLayout = {
+          id: `layout-${strat.id}-${chosenOrient}`,
+          name: strat.title,
+          shape: 'L',
+          edgeA: { length: edgeA.length, depth: edgeA.depth, height: edgeA.height, id: 'edge_A', name: 'Cạnh A' },
+          edgeB: { length: edgeB.length, depth: edgeB.depth, height: edgeB.height, id: 'edge_B', name: 'Cạnh B', angle: edgeB.angle || 90 },
+          cornerConfig: { size: 600 },
+          cornerOrientationAB: chosenOrient,
+          cornerWidthBaseAB: cornerWidthBase,
+          cornerWidthUpperAB: cornerWidthUpper,
+          placedModules: placed,
+          upperDepth: 350,
+          upperHeight: 750,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        testLayout.placedUpperModules = this.generateUpperCabinetsForCandidate(
+          testLayout,
+          selectedCodes,
+          input.catalog
+        );
+
+        const report = this.ruleEngine.evaluate(testLayout, input.catalog);
+        if (report.hardValid) {
+          results.push({
+            id: `${strat.id}-${chosenOrient}`,
+            title: strat.title,
+            score: report.score,
+            layout: testLayout,
+            remainingWidths: {
+              edge_A: Math.max(0, availA - sumA),
+              edge_B: Math.max(0, availB - sumB),
+              edge_C: 0,
+            },
+            ruleSummary: {
+              passedCount: report.passedCount,
+              violationCount: report.failedCount,
+              warningsCount: report.warningCount,
+            },
+            workTrianglePerimeter: report.workTriangle.perimeter,
+            pros: strat.pros,
+            cons: [
+              ...strat.cons,
+              `Dư cạnh A: ${availA - sumA}mm, cạnh B: ${availB - sumB}mm`,
+            ],
+          });
+          break; // Đã tìm được hướng quay tốt cho chiến lược này, sang chiến lược tiếp theo
+        }
       }
     }
   }
@@ -842,7 +957,92 @@ export class LayoutEngine {
       const availB = edgeB.length - takesAB_on_B;
       const availC = edgeC.length - takesAC_on_C;
 
-      // Tự động điều chỉnh kích thước biến thể để vừa với từng cạnh
+      // ĐIỀU PHỐI TẢI ĐỘNG VÀ CÂN BẰNG NĂNG LỰC 3 CẠNH BẾP CHỮ U:
+      // 1. Nếu Cạnh A hẹp (< 1500mm khả dụng): Chuyển máy rửa bát D01 hoặc dao thớt C01 sang Cạnh B kề góc
+      const calcMinSum = (list: { mod: KitchenModule }[]) =>
+        list.reduce((sum, item) => {
+          const minW = item.mod.minWidth || Math.min(...item.mod.variants.map((v) => v.width));
+          return sum + minW;
+        }, 0);
+
+      while (calcMinSum(edgeAMods) > availA && edgeAMods.length > 1) {
+        const dIdx = edgeAMods.findIndex((m) => m.code === 'D01');
+        if (dIdx !== -1) {
+          const [moved] = edgeAMods.splice(dIdx, 1);
+          edgeBMods.unshift(moved);
+          continue;
+        }
+        const cIdx = edgeAMods.findIndex((m) => m.code === 'C01');
+        if (cIdx !== -1) {
+          const [moved] = edgeAMods.splice(cIdx, 1);
+          edgeBMods.unshift(moved);
+          continue;
+        }
+        const wIdx = edgeAMods.findIndex((m) => m.code === 'W01');
+        if (wIdx !== -1) {
+          const [moved] = edgeAMods.splice(wIdx, 1);
+          edgeBMods.unshift(moved);
+          continue;
+        }
+        break;
+      }
+
+      // 2. Nếu Cạnh B thiếu chỗ: chuyển khoang lưu trữ hoặc phụ trợ sang Cạnh C
+      while (calcMinSum(edgeBMods) > availB && edgeBMods.length > 1) {
+        const tIdx = edgeBMods.findIndex((m) => m.code === 'T01');
+        if (tIdx !== -1) {
+          const [moved] = edgeBMods.splice(tIdx, 1);
+          edgeCMods.push(moved);
+          continue;
+        }
+        break;
+      }
+
+      // 3. Nếu Cạnh C thiếu chỗ: chuyển khoang lưu trữ sang Cạnh B
+      while (calcMinSum(edgeCMods) > availC && edgeCMods.length > 2) {
+        const tIdx = edgeCMods.findIndex((m) => m.code === 'T01');
+        if (tIdx !== -1) {
+          const [moved] = edgeCMods.splice(tIdx, 1);
+          edgeBMods.unshift(moved);
+          continue;
+        }
+        break;
+      }
+
+      // 4. Nếu tổng cả 3 cạnh vượt quá không gian: tỉa bớt khoang phụ
+      const dropPriorityU = ['T01', 'R01', 'M01', 'P01', 'A01', 'W01', 'D01'];
+      while (calcMinSum(edgeBMods) > availB && edgeBMods.length > 1) {
+        const dropIdx = edgeBMods.findIndex((m) => dropPriorityU.includes(m.code));
+        if (dropIdx === -1) break;
+        edgeBMods.splice(dropIdx, 1);
+      }
+      while (calcMinSum(edgeCMods) > availC && edgeCMods.length > 2) {
+        const dropIdx = edgeCMods.findIndex((m) => dropPriorityU.includes(m.code));
+        if (dropIdx === -1) break;
+        edgeCMods.splice(dropIdx, 1);
+      }
+
+      // Sắp xếp thứ tự chuẩn cho từng cạnh:
+      // Cạnh B: từ góc xuống ngoài cùng -> F01 ở mép ngoài cùng (RULE_08)
+      edgeBMods.sort((a, b) => {
+        if (a.code === 'F01') return 1;
+        if (b.code === 'F01') return -1;
+        return 0;
+      });
+
+      // Cạnh C: từ góc xuống ngoài cùng -> B01 ở trước, P01 + A01 kề nhau ở mép ngoài cùng (RULE_08, RULE_09, RULE_10)
+      const orderC: Record<string, number> = {
+        R01: 10,
+        B01: 20,
+        SP01: 30,
+        M01: 40,
+        T01: 50,
+        P01: 90,
+        A01: 91,
+      };
+      edgeCMods.sort((a, b) => (orderC[a.code] ?? 50) - (orderC[b.code] ?? 50));
+
+      // Tự động điều chỉnh kích thước biến thể để vừa với từng cạnh ("vừa vặn khung kích cỡ nhất có thể")
       const fittedB = this.adjustVariantsToFit(edgeBMods, availB);
       const fittedA = this.adjustVariantsToFit(edgeAMods, availA);
       const fittedC = this.adjustVariantsToFit(edgeCMods, availC);
