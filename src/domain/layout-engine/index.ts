@@ -159,21 +159,24 @@ export class LayoutEngine {
       return null;
     }
 
-    // Ban đầu chọn biến thể lớn nhất cho mỗi khoang
+    // Ban đầu chọn biến thể mặc định (isDefault) hoặc biến thể tiêu chuẩn của mỗi khoang
     const chosen = modules.map((m) => {
-      const sorted = [...m.mod.variants].sort((a, b) => b.width - a.width);
+      const sortedDesc = [...m.mod.variants].sort((a, b) => b.width - a.width);
+      const defVar = m.mod.variants.find((v) => v.isDefault) || sortedDesc[0];
+      const defIdx = sortedDesc.findIndex((v) => v.id === defVar.id);
       return {
         ...m,
-        variant: sorted[0],
-        allVariantsDesc: sorted,
-        varIdx: 0,
+        variant: defVar,
+        allVariantsDesc: sortedDesc,
+        varIdx: defIdx >= 0 ? defIdx : 0,
       };
     });
 
     let currentSum = chosen.reduce((sum, item) => sum + item.variant.width, 0);
 
     // Thứ tự ưu tiên giảm kích thước khoang khi không đủ không gian
-    const shrinkPriority = ['T01', 'SP01', 'C01', 'W01', 'R01', 'D01', 'P01', 'B01', 'S01', 'F01'];
+    // Bảo vệ các khoang thiết bị và đệm an toàn nhiệt
+    const shrinkPriority = ['T01', 'C01', 'R01', 'W01', 'P01', 'B01', 'S01', 'F01', 'SP01'];
 
     while (currentSum > availLength) {
       let shrank = false;
@@ -184,6 +187,15 @@ export class LayoutEngine {
           (c) => c.code === targetCode && c.varIdx < c.allVariantsDesc.length - 1
         );
         if (item) {
+          // Bảo vệ khoảng cách an toàn: không giảm SP01 xuống dưới 300mm nếu các khoang khác vẫn có thể giảm
+          const nextVar = item.allVariantsDesc[item.varIdx + 1];
+          if (item.code === 'SP01' && nextVar.width < 300) {
+            const hasOtherChoice = chosen.some(
+              (c) => c.code !== 'SP01' && c.varIdx < c.allVariantsDesc.length - 1
+            );
+            if (hasOtherChoice) continue;
+          }
+
           const oldW = item.variant.width;
           item.varIdx++;
           item.variant = item.allVariantsDesc[item.varIdx];
@@ -285,56 +297,49 @@ export class LayoutEngine {
     strategyConfigs.push(
       {
         id: 'strat-i-opt1',
-        title: 'Phương án chuẩn NKBA: Tủ lạnh mép trái ➔ Chậu rửa ➔ Bếp nấu ➔ Khối tủ cao mép phải',
+        title: 'Phương án chuẩn NKBA: Tủ lạnh mép trái ➔ Chậu rửa ➔ Bếp nấu ➔ Cụm tủ cao đối diện mép phải',
         order: ['F01', 'C01', 'W01', 'S01', 'D01', 'R01', 'B01', 'SP01', 'M01', 'T01', 'P01', 'A01'],
         pros: [
           'Tủ lạnh đặt ở mép ngoài cùng bên trái tiện tiếp cận thực phẩm',
           'Chậu rửa kẹp giữa bàn sơ chế và máy rửa bát theo chu trình liên hoàn',
           'Bếp nấu cách ly an toàn với chậu rửa và tủ cao',
-          'Cụm tủ cao (tủ khô, tủ thiết bị) nằm gọn ở mép phải không chắn mặt bàn',
+          'Cụm tủ cao (tủ khô & thiết bị) kề nhau ở mép phải đối diện tạo thế đối trọng cân xứng',
         ],
         cons: ['Cần chiều dài mặt bằng tương ứng số khoang đã chọn'],
       },
       {
         id: 'strat-i-opt2',
-        title: 'Phương án sơ chế trung tâm: Tủ lạnh ➔ Máy rửa bát ➔ Chậu ➔ Dao thớt ➔ Bếp',
+        title: 'Phương án sơ chế trung tâm: Tủ lạnh ➔ Máy rửa bát ➔ Chậu ➔ Dao thớt ➔ Bếp ➔ Cụm tủ cao đối diện',
         order: ['F01', 'D01', 'W01', 'S01', 'C01', 'R01', 'B01', 'SP01', 'M01', 'T01', 'P01', 'A01'],
         pros: [
           'Chậu rửa kẹp giữa Máy rửa bát và Dao thớt',
           'Khoang dao thớt đóng vai trò bàn đệm sơ chế lớn ngay trước bếp nấu',
+          'Cụm tủ cao ở mép phải đối diện hoàn toàn với tủ lạnh mép trái',
           'An toàn điện nước tuyệt đối',
         ],
         cons: ['Máy rửa bát đặt cạnh tủ lạnh'],
       },
       {
         id: 'strat-i-opt3',
-        title: 'Phương án khối tủ cao tập trung bên trái: Tủ lạnh ➔ Tủ khô ➔ Tủ thiết bị ➔ Bàn bếp',
-        order: ['F01', 'P01', 'A01', 'C01', 'W01', 'S01', 'D01', 'R01', 'B01', 'SP01', 'M01', 'T01'],
+        title: 'Phương án an toàn nhiệt: Tủ lạnh mép trái ➔ Bếp nấu ➔ Sơ chế ➔ Chậu rửa ➔ Cụm tủ cao đối diện',
+        order: ['F01', 'SP01', 'B01', 'C01', 'W01', 'S01', 'D01', 'R01', 'M01', 'T01', 'P01', 'A01'],
         pros: [
-          'Tủ lạnh ưu tiên ở mép ngoài cùng bên trái, tiếp theo là cụm tủ khô và thiết bị',
-          'Mặt bàn bếp trải dài liền mạch từ giữa sang phải',
+          'Tủ lạnh mép trái và cụm tủ cao (tủ khô & thiết bị) ở mép phải đối diện',
+          'Khoang máy rửa bát và chậu rửa đóng vai trò đệm an toàn giữa bếp nấu và tủ cao',
+          'Mặt bàn bếp trải dài liền mạch',
         ],
-        cons: ['Bếp nấu nằm gần mép phải'],
+        cons: ['Bếp nấu nằm gần phía tủ lạnh'],
       },
       {
         id: 'strat-i-opt4',
-        title: 'Phương án đảo chiều: Bàn bếp bên trái ➔ Tủ lạnh mép ngoài bên phải',
-        order: ['P01', 'A01', 'T01', 'M01', 'SP01', 'B01', 'R01', 'D01', 'W01', 'S01', 'C01', 'F01'],
+        title: 'Phương án đảo chiều: Cụm tủ cao mép trái ➔ Chậu & Bếp ➔ Tủ lạnh đối diện mép phải',
+        order: ['P01', 'A01', 'T01', 'M01', 'D01', 'W01', 'S01', 'C01', 'R01', 'B01', 'SP01', 'F01'],
         pros: [
           'Thích hợp khi luồng di chuyển hoặc nguồn cấp điện nước ở phía phải',
-          'Tủ lạnh đặt sát mép ngoài cùng bên phải',
+          'Cụm tủ cao (P01 & A01) kề nhau ở mép trái, tủ lạnh đặt sát mép ngoài cùng bên phải',
+          'Đối trọng thẩm mỹ cân đối hoàn hảo',
         ],
         cons: ['Đảo ngược vị trí tủ lạnh sang phải'],
-      },
-      {
-        id: 'strat-i-opt5',
-        title: 'Phương án khối tủ cao tập trung bên phải: Bàn bếp ➔ Cụm tủ khô & thiết bị ➔ Tủ lạnh mép ngoài',
-        order: ['T01', 'M01', 'SP01', 'B01', 'R01', 'D01', 'S01', 'W01', 'C01', 'P01', 'A01', 'F01'],
-        pros: [
-          'Hệ tủ cao quy tụ về một phía bên phải phòng bếp với tủ lạnh ngoài cùng',
-          'Khu nấu và rửa thông thoáng',
-        ],
-        cons: ['Khối tủ cao bên phải'],
       }
     );
 

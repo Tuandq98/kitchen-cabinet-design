@@ -460,8 +460,8 @@ export const DEFAULT_RULES: DesignRule[] = [
   {
     id: 'rule-tall-pantry-appliance-adjacent',
     code: 'RULE_09',
-    name: 'Tủ đồ khô cao và Tủ thiết bị cao nên đặt cạnh nhau',
-    description: 'Khoang tủ đồ khô cao tầng (P01) và khoang tủ thiết bị cao tầng (A01) nên được bố trí liền kề nhau để tạo thành khối tủ đứng thống nhất, cân đối với vị trí tủ lạnh (F01) ở khu vực rìa đối diện.',
+    name: 'Tủ đồ khô cao và Tủ thiết bị cao nên đặt cạnh nhau và đối diện tủ lạnh',
+    description: 'Khoang tủ đồ khô cao tầng (P01) và khoang tủ thiết bị cao tầng (A01) nên được bố trí liền kề nhau để tạo thành khối tủ đứng thống nhất, và phải được bố trí ở rìa/cạnh đối diện so với vị trí của khoang tủ lạnh (F01) để tạo đối trọng thẩm mỹ và cân bằng không gian bếp.',
     type: 'TALL_PANTRY_APPLIANCE_ADJACENT',
     severity: 'WARNING', // Soft constraint
     enabled: true,

@@ -119,10 +119,19 @@ export const RuleManagerModal: React.FC<RuleManagerModalProps> = ({
               {/* Nhóm 1 */}
               <div className="space-y-1.5">
                 <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider block px-1">
-                  1. Ràng buộc cứng (Hard Constraints)
+                  1. Ràng buộc cứng & Vị trí Hệ tủ đứng
                 </span>
                 {rules
-                  .filter((r) => ['RULE_01', 'RULE_OVERFLOW', 'RULE_02', 'RULE_06'].includes(r.code))
+                  .filter((r) =>
+                    [
+                      'RULE_01',
+                      'RULE_OVERFLOW',
+                      'RULE_02',
+                      'RULE_06',
+                      'RULE_07',
+                      'RULE_08',
+                    ].includes(r.code)
+                  )
                   .map((rule) => (
                     <div
                       key={rule.id}
@@ -164,10 +173,10 @@ export const RuleManagerModal: React.FC<RuleManagerModalProps> = ({
               {/* Nhóm 2 */}
               <div className="space-y-1.5">
                 <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block px-1">
-                  2. Khoảng cách & Công thái học NKBA
+                  2. Khoảng cách & Bố trí đối trọng NKBA
                 </span>
                 {rules
-                  .filter((r) => ['RULE_05', 'RULE_03'].includes(r.code))
+                  .filter((r) => ['RULE_09', 'RULE_05', 'RULE_03'].includes(r.code))
                   .map((rule) => (
                     <div
                       key={rule.id}
@@ -182,7 +191,7 @@ export const RuleManagerModal: React.FC<RuleManagerModalProps> = ({
                         <div className="space-y-1">
                           <div className="flex items-center gap-1.5">
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded font-mono bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                              ƯU TIÊN (SOFT)
+                              {rule.code === 'RULE_09' ? 'ĐỐI TRỌNG CÂN ĐỐI' : 'ƯU TIÊN (SOFT)'}
                             </span>
                             <span className="text-[10px] font-mono font-bold text-slate-400">
                               {rule.code}
@@ -257,7 +266,15 @@ export const RuleManagerModal: React.FC<RuleManagerModalProps> = ({
                   4. Quy tắc Tủ Trên (Upper Cabinets)
                 </span>
                 {rules
-                  .filter((r) => ['RULE_U01', 'RULE_U02', 'RULE_U03', 'RULE_U04'].includes(r.code))
+                  .filter((r) =>
+                    [
+                      'RULE_U01',
+                      'RULE_U02',
+                      'RULE_U03',
+                      'RULE_U04',
+                      'RULE_U05',
+                    ].includes(r.code)
+                  )
                   .map((rule) => (
                     <div
                       key={rule.id}
@@ -301,6 +318,97 @@ export const RuleManagerModal: React.FC<RuleManagerModalProps> = ({
                     </div>
                   ))}
               </div>
+
+              {/* Nhóm 5: Quy tắc khác (nếu có bất kỳ quy tắc nào ngoài các nhóm trên) */}
+              {rules.filter(
+                (r) =>
+                  ![
+                    'RULE_01',
+                    'RULE_OVERFLOW',
+                    'RULE_02',
+                    'RULE_06',
+                    'RULE_07',
+                    'RULE_08',
+                    'RULE_09',
+                    'RULE_05',
+                    'RULE_03',
+                    'RULE_04A',
+                    'RULE_04B',
+                    'RULE_04C',
+                    'RULE_04D',
+                    'RULE_U01',
+                    'RULE_U02',
+                    'RULE_U03',
+                    'RULE_U04',
+                    'RULE_U05',
+                  ].includes(r.code)
+              ).length > 0 && (
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider block px-1">
+                    5. Quy tắc bổ sung khác
+                  </span>
+                  {rules
+                    .filter(
+                      (r) =>
+                        ![
+                          'RULE_01',
+                          'RULE_OVERFLOW',
+                          'RULE_02',
+                          'RULE_06',
+                          'RULE_07',
+                          'RULE_08',
+                          'RULE_09',
+                          'RULE_05',
+                          'RULE_03',
+                          'RULE_04A',
+                          'RULE_04B',
+                          'RULE_04C',
+                          'RULE_04D',
+                          'RULE_U01',
+                          'RULE_U02',
+                          'RULE_U03',
+                          'RULE_U04',
+                          'RULE_U05',
+                        ].includes(r.code)
+                    )
+                    .map((rule) => (
+                      <div
+                        key={rule.id}
+                        onClick={() => setActiveRuleId(rule.id)}
+                        className={`p-2.5 rounded-xl border cursor-pointer transition ${
+                          activeRuleId === rule.id
+                            ? 'bg-slate-800/90 border-purple-500 shadow-md ring-1 ring-purple-500/20'
+                            : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded font-mono bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                                {rule.severity}
+                              </span>
+                              <span className="text-[10px] font-mono font-bold text-slate-400">
+                                {rule.code}
+                              </span>
+                            </div>
+                            <h4 className="text-xs font-bold text-slate-200">
+                              {rule.name}
+                            </h4>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={rule.enabled}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              toggleRule(rule.id);
+                            }}
+                            className="w-4 h-4 accent-purple-500 rounded cursor-pointer mt-0.5"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
 
             {/* Bottom Actions */}

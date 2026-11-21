@@ -742,41 +742,112 @@ export class RuleEngine {
   ): void {
     const p01 = layout.placedModules.find((m) => m.code === 'P01');
     const a01 = layout.placedModules.find((m) => m.code === 'A01');
+    const f01 = layout.placedModules.find(
+      (m) => m.code === 'F01' || m.category === 'refrigeration'
+    );
 
-    if (!p01 || !a01) return;
+    if (!p01 && !a01) return;
 
-    // 1. Kiểm tra có nằm cùng trên một cạnh hay không
-    if (p01.edgeId !== a01.edgeId) {
-      violations.push({
-        ruleId: rule.id,
-        ruleCode: rule.code,
-        ruleName: rule.name,
-        severity: rule.severity,
-        message: `Khoang tủ đồ khô (${p01.name} - P01) và Khoang tủ thiết bị (${a01.name} - A01) đang nằm ở 2 cạnh khác nhau (${p01.edgeId === 'edge_A' ? 'Cạnh A' : p01.edgeId === 'edge_B' ? 'Cạnh B' : 'Cạnh C'} và ${a01.edgeId === 'edge_A' ? 'Cạnh A' : a01.edgeId === 'edge_B' ? 'Cạnh B' : 'Cạnh C'}).`,
-        recommendation: `Khoang tủ đồ khô cao tầng và khoang tủ thiết bị cao tầng nên đặt cạnh nhau để tạo thành khối tủ đứng thống nhất, cân đối với vị trí tủ lạnh ở khu vực rìa đối diện.`,
-        involvedModuleIds: [p01.instanceId, a01.instanceId],
-      });
-      return;
+    // 1. Kiểm tra hai khoang tủ đồ khô và tủ thiết bị có nằm cùng cạnh và liền kề nhau không
+    if (p01 && a01) {
+      if (p01.edgeId !== a01.edgeId) {
+        violations.push({
+          ruleId: rule.id,
+          ruleCode: rule.code,
+          ruleName: rule.name,
+          severity: rule.severity,
+          message: `Khoang tủ đồ khô (${p01.name} - P01) và Khoang tủ thiết bị (${a01.name} - A01) đang nằm ở 2 cạnh khác nhau (${p01.edgeId === 'edge_A' ? 'Cạnh A' : p01.edgeId === 'edge_B' ? 'Cạnh B' : 'Cạnh C'} và ${a01.edgeId === 'edge_A' ? 'Cạnh A' : a01.edgeId === 'edge_B' ? 'Cạnh B' : 'Cạnh C'}).`,
+          recommendation: `Khoang tủ đồ khô cao tầng và khoang tủ thiết bị cao tầng nên đặt cạnh nhau để tạo thành khối tủ đứng thống nhất, cân đối với vị trí tủ lạnh ở khu vực rìa đối diện.`,
+          involvedModuleIds: [p01.instanceId, a01.instanceId],
+        });
+      } else {
+        const edgeModules = layout.placedModules
+          .filter((m) => m.edgeId === p01.edgeId)
+          .sort((a, b) => a.positionIndex - b.positionIndex);
+
+        const idxP = edgeModules.findIndex((m) => m.instanceId === p01.instanceId);
+        const idxA = edgeModules.findIndex((m) => m.instanceId === a01.instanceId);
+
+        if (Math.abs(idxP - idxA) !== 1) {
+          violations.push({
+            ruleId: rule.id,
+            ruleCode: rule.code,
+            ruleName: rule.name,
+            severity: rule.severity,
+            message: `Khoang tủ đồ khô cao tầng (P01) và Khoang tủ thiết bị cao tầng (A01) đang bị phân tách bởi các khoang khác.`,
+            recommendation: `Nên đặt khoang tủ đồ khô và khoang tủ thiết bị cao tầng liền kề nhau để tạo thành khối tủ đứng đồng nhất, cân đối với tủ lạnh ở rìa đối diện.`,
+            involvedModuleIds: [p01.instanceId, a01.instanceId],
+          });
+        }
+      }
     }
 
-    // 2. Nếu cùng cạnh, kiểm tra xem có đặt liền kề nhau không (không bị các khoang khác xen vào giữa)
-    const edgeModules = layout.placedModules
-      .filter((m) => m.edgeId === p01.edgeId)
-      .sort((a, b) => a.positionIndex - b.positionIndex);
+    // 2. Kiểm tra điều kiện "đối diện với vị trí của khoang tủ lạnh":
+    // Cụm tủ cao (P01 / A01) phải được bố trí ở rìa đối diện so với vị trí tủ lạnh F01
+    if (f01 && (p01 || a01)) {
+      const tallCodesInvolved = [p01?.instanceId, a01?.instanceId].filter(Boolean) as string[];
 
-    const idxP = edgeModules.findIndex((m) => m.instanceId === p01.instanceId);
-    const idxA = edgeModules.findIndex((m) => m.instanceId === a01.instanceId);
+      if (layout.shape === 'I') {
+        const edgeModules = layout.placedModules
+          .filter((m) => m.edgeId === 'edge_A')
+          .sort((a, b) => a.positionIndex - b.positionIndex);
 
-    if (Math.abs(idxP - idxA) !== 1) {
-      violations.push({
-        ruleId: rule.id,
-        ruleCode: rule.code,
-        ruleName: rule.name,
-        severity: rule.severity,
-        message: `Khoang tủ đồ khô cao tầng (P01) và Khoang tủ thiết bị cao tầng (A01) đang bị phân tách bởi các khoang khác.`,
-        recommendation: `Nên đặt khoang tủ đồ khô và khoang tủ thiết bị cao tầng liền kề nhau để tạo thành khối tủ đứng đồng nhất, cân đối với tủ lạnh ở rìa đối diện.`,
-        involvedModuleIds: [p01.instanceId, a01.instanceId],
-      });
+        if (edgeModules.length >= 3) {
+          const idxF = edgeModules.findIndex((m) => m.instanceId === f01.instanceId);
+          const idxP = p01 ? edgeModules.findIndex((m) => m.instanceId === p01.instanceId) : -1;
+          const idxA = a01 ? edgeModules.findIndex((m) => m.instanceId === a01.instanceId) : -1;
+
+          const mid = (edgeModules.length - 1) / 2;
+          const fIsLeft = idxF < mid;
+
+          // Kiểm tra xem P01 hoặc A01 có bị dồn sang cùng một nửa cạnh với F01 hay không
+          const pIsSameSide = idxP !== -1 && (idxP < mid) === fIsLeft;
+          const aIsSameSide = idxA !== -1 && (idxA < mid) === fIsLeft;
+
+          // Hoặc kiểm tra khoảng cách kề cận trực tiếp với F01 (trong phạm vi 2 khoang)
+          const isClusteredWithFridge = [idxP, idxA]
+            .filter((i) => i !== -1)
+            .some((i) => Math.abs(i - idxF) <= 2);
+
+          if (pIsSameSide || aIsSameSide || isClusteredWithFridge) {
+            violations.push({
+              ruleId: rule.id,
+              ruleCode: rule.code,
+              ruleName: rule.name,
+              severity: rule.severity,
+              message: `Khoang tủ đồ khô / tủ thiết bị cao tầng đang được bố trí cùng một phía với Khoang tủ lạnh (F01).`,
+              recommendation: `Khoang tủ đồ khô cao tầng và khoang tủ thiết bị cao tầng nên được bố trí ở đầu mép đối diện so với vị trí tủ lạnh (ví dụ: Tủ lạnh ở mép trái, Cụm tủ cao ở mép phải) để tạo thế đối trọng cân xứng và hài hòa cho không gian bếp.`,
+              involvedModuleIds: [f01.instanceId, ...tallCodesInvolved],
+            });
+          }
+        }
+      } else if (layout.shape === 'L') {
+        const tallEdge = p01 ? p01.edgeId : a01!.edgeId;
+        if (f01.edgeId === tallEdge) {
+          violations.push({
+            ruleId: rule.id,
+            ruleCode: rule.code,
+            ruleName: rule.name,
+            severity: rule.severity,
+            message: `Tủ lạnh (F01) và Cụm tủ cao (P01 / A01) đang cùng nằm trên ${f01.edgeId === 'edge_A' ? 'Cạnh A' : 'Cạnh B'}.`,
+            recommendation: `Nên bố trí Tủ lạnh ở một cạnh (ví dụ Cạnh A) và Cụm tủ cao (P01 & A01) ở cạnh đối diện (Cạnh B) để tạo thế đối xứng và thông thoáng cho căn bếp.`,
+            involvedModuleIds: [f01.instanceId, ...tallCodesInvolved],
+          });
+        }
+      } else if (layout.shape === 'U') {
+        const tallEdge = p01 ? p01.edgeId : a01!.edgeId;
+        if (f01.edgeId === tallEdge) {
+          violations.push({
+            ruleId: rule.id,
+            ruleCode: rule.code,
+            ruleName: rule.name,
+            severity: rule.severity,
+            message: `Tủ lạnh (F01) và Cụm tủ cao (P01 / A01) đang cùng nằm trên ${f01.edgeId === 'edge_B' ? 'Cạnh B' : 'Cạnh C'}.`,
+            recommendation: `Nên bố trí Tủ lạnh ở một cánh và Cụm tủ cao (P01 & A01) ở cánh đối diện (ví dụ Tủ lạnh ở Cạnh B, Cụm tủ cao ở Cạnh C) để tạo sự cân xứng tuyệt đối cho bếp chữ U.`,
+            involvedModuleIds: [f01.instanceId, ...tallCodesInvolved],
+          });
+        }
+      }
     }
   }
 
