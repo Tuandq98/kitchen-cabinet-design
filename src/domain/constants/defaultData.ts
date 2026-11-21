@@ -126,6 +126,8 @@ export const DEFAULT_MODULES: KitchenModule[] = [
     category: 'storage',
     description: 'Tủ ngăn kéo 2 tầng hoặc cánh mở chia đợt để xoong nồi, đồ khô',
     color: '#f59e0b', // Amber-500
+    minWidth: 300,
+    maxWidth: 1200,
     variants: [
       { id: 'var-t01-600', width: 600, depth: 600, height: 850, isDefault: true },
       { id: 'var-t01-300', width: 300, depth: 600, height: 850 },

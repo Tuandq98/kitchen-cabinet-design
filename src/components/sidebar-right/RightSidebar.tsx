@@ -1,5 +1,9 @@
 import React from 'react';
-import { useKitchenStore, getUpperModuleSpaceInfo } from '../../store/useKitchenStore';
+import {
+  useKitchenStore,
+  getUpperModuleSpaceInfo,
+  getBaseModuleSpaceInfo,
+} from '../../store/useKitchenStore';
 import { computeUpperGaps } from '../../utils/geometry';
 import {
   ShieldAlert,
@@ -34,6 +38,7 @@ export const RightSidebar: React.FC = () => {
     updatePlacedModuleVariant,
     updatePlacedModuleCustomWidth,
     autoFitUpperStorage,
+    autoFitBaseStorage,
     moveModule,
   } = useKitchenStore();
 
@@ -58,6 +63,11 @@ export const RightSidebar: React.FC = () => {
   const isUpperSelected = selectedModule && selectedModule.tier === 'upper';
   const upperSpaceInfo = isUpperSelected
     ? getUpperModuleSpaceInfo(selectedModule.instanceId, layout)
+    : null;
+
+  const isBaseT01Selected = selectedModule && selectedModule.tier !== 'upper' && selectedModule.code === 'T01';
+  const baseSpaceInfo = isBaseT01Selected
+    ? getBaseModuleSpaceInfo(selectedModule.instanceId, layout)
     : null;
 
   // Danh sách các khoảng trống còn lại của hệ tủ trên
@@ -337,6 +347,125 @@ export const RightSidebar: React.FC = () => {
                     +10
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* Khoang tủ chứa đồ tủ dưới (T01): Tùy chỉnh linh hoạt giống khoang tủ trên (tối thiểu 300mm) */}
+            {selectedModule.code === 'T01' && (
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Chiều rộng tủ dưới linh hoạt:</span>
+                  </label>
+                  <span className="text-[10px] text-amber-400 font-mono font-bold">
+                    300mm - {baseSpaceInfo ? baseSpaceInfo.maxAllowedWidth : 1200}mm
+                  </span>
+                </div>
+
+                {/* Input số mm trực tiếp + Step buttons */}
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={selectedModule.width <= 300}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.max(300, selectedModule.width - 50)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Giảm 50mm"
+                  >
+                    -50
+                  </button>
+                  <button
+                    disabled={selectedModule.width <= 300}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.max(300, selectedModule.width - 10)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Giảm 10mm"
+                  >
+                    -10
+                  </button>
+                  <div className="relative flex-1">
+                    <input
+                      type="number"
+                      min={300}
+                      max={baseSpaceInfo ? baseSpaceInfo.maxAllowedWidth : 1200}
+                      step={10}
+                      value={selectedModule.width}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (!isNaN(val) && val >= 300) {
+                          updatePlacedModuleCustomWidth(selectedModule.instanceId, val);
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono font-bold text-amber-400 focus:outline-none focus:border-amber-500"
+                    />
+                    <span className="absolute right-2 top-1.5 text-[10px] text-slate-500 pointer-events-none">
+                      mm
+                    </span>
+                  </div>
+                  <button
+                    disabled={Boolean(baseSpaceInfo && selectedModule.width >= baseSpaceInfo.maxAllowedWidth)}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        selectedModule.width + 10
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title={
+                      baseSpaceInfo && selectedModule.width >= baseSpaceInfo.maxAllowedWidth
+                        ? 'Đã đạt kích thước tối đa của cạnh bếp, không thể tăng thêm để tránh tràn cạnh'
+                        : 'Tăng 10mm'
+                    }
+                  >
+                    +10
+                  </button>
+                  <button
+                    disabled={Boolean(baseSpaceInfo && selectedModule.width >= baseSpaceInfo.maxAllowedWidth)}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        selectedModule.width + 50
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title={
+                      baseSpaceInfo && selectedModule.width >= baseSpaceInfo.maxAllowedWidth
+                        ? 'Đã đạt kích thước tối đa của cạnh bếp, không thể tăng thêm để tránh tràn cạnh'
+                        : 'Tăng 50mm'
+                    }
+                  >
+                    +50
+                  </button>
+                </div>
+
+                {/* Nút Auto-fit tự động lấp đầy khoảng trống cạnh bếp */}
+                <button
+                  disabled={Boolean(baseSpaceInfo && (selectedModule.width >= baseSpaceInfo.maxAllowedWidth || baseSpaceInfo.remainingEdgeGap <= 0))}
+                  onClick={() => autoFitBaseStorage(selectedModule.instanceId)}
+                  className="w-full py-1.5 px-3 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Tự động tính toán để khoang tủ chứa đồ tủ dưới này lấp đầy toàn bộ khoảng trống còn lại của cạnh bếp"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>⚡ Tự động lấp đầy cạnh bếp (Auto-Fit)</span>
+                </button>
+
+                {/* Trạng thái khoảng trống cạnh bếp */}
+                {baseSpaceInfo && (
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
+                    <span>Khoảng trống cạnh còn lại:</span>
+                    <span className={baseSpaceInfo.remainingEdgeGap === 0 ? 'text-emerald-400 font-bold' : 'text-slate-300 font-mono'}>
+                      {baseSpaceInfo.remainingEdgeGap === 0 ? 'Vừa khít (0mm)' : `${baseSpaceInfo.remainingEdgeGap}mm`}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

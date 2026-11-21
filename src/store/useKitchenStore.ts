@@ -12,7 +12,7 @@ import {
 import { DEFAULT_MODULES, DEFAULT_RULES, INITIAL_LAYOUT } from '../domain/constants/defaultData';
 import { RuleEngine } from '../domain/rule-engine';
 import { LayoutEngine } from '../domain/layout-engine';
-import { computeUpperGaps } from '../utils/geometry';
+import { computeUpperGaps, getAvailableEdgeLength } from '../utils/geometry';
 
 export interface UpperModuleSpaceInfo {
   leftGap: number;
@@ -21,6 +21,13 @@ export interface UpperModuleSpaceInfo {
   totalEdgeGap: number;
   segmentSpan: number;
   otherWidthsInSegment: number;
+}
+
+export interface BaseModuleSpaceInfo {
+  maxAllowedWidth: number;
+  remainingEdgeGap: number;
+  edgeTotalLength: number;
+  otherModulesWidth: number;
 }
 
 interface KitchenStoreState {
@@ -101,6 +108,7 @@ interface KitchenStoreState {
   updatePlacedModuleVariant: (instanceId: string, variantId: string) => void;
   updatePlacedModuleCustomWidth: (instanceId: string, customWidth: number) => void;
   autoFitUpperStorage: (instanceId: string) => void;
+  autoFitBaseStorage: (instanceId: string) => void;
   setLayout: (newLayout: KitchenLayout) => void;
 
   // - Undo / Redo
@@ -553,6 +561,42 @@ export function getUpperModuleSpaceInfo(
     totalEdgeGap: Math.round(totalEdgeGap),
     segmentSpan: Math.round(totalSegSpan),
     otherWidthsInSegment: Math.round(otherWidthsInSegment),
+  };
+}
+
+/**
+ * Tính toán thông tin khoảng trống và kích thước tối đa cho phép của một khoang tủ dưới (T01)
+ * Đảm bảo kích thước không làm tràn chiều dài khả dụng của cạnh bếp (EDGE_OVERFLOW)
+ */
+export function getBaseModuleSpaceInfo(
+  instanceId: string,
+  layout: KitchenLayout
+): BaseModuleSpaceInfo {
+  const targetBase = layout.placedModules.find((m) => m.instanceId === instanceId);
+  if (!targetBase) {
+    return {
+      maxAllowedWidth: 1200,
+      remainingEdgeGap: 0,
+      edgeTotalLength: 0,
+      otherModulesWidth: 0,
+    };
+  }
+
+  const edgeId = targetBase.edgeId;
+  const availLength = getAvailableEdgeLength(layout, edgeId);
+  const baseOnEdge = layout.placedModules.filter((m) => m.edgeId === edgeId);
+  const otherModulesWidth = baseOnEdge
+    .filter((m) => m.instanceId !== instanceId)
+    .reduce((sum, m) => sum + m.width, 0);
+
+  const remainingEdgeGap = Math.max(0, availLength - (otherModulesWidth + targetBase.width));
+  const maxAllowedWidth = Math.max(300, availLength - otherModulesWidth);
+
+  return {
+    maxAllowedWidth: Math.round(maxAllowedWidth),
+    remainingEdgeGap: Math.round(remainingEdgeGap),
+    edgeTotalLength: Math.round(availLength),
+    otherModulesWidth: Math.round(otherModulesWidth),
   };
 }
 
@@ -1458,12 +1502,21 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
     updatePlacedModuleCustomWidth: (instanceId, customWidth) => {
       const state = get();
 
-      // 1. Khoang chậu rửa tủ dưới (S01): Tùy chỉnh linh hoạt từ 830mm đến 900mm (Chuẩn mặc định 850mm)
+      // 1. Khoang tủ dưới (S01: chậu rửa linh hoạt 830-900mm, T01: tủ chứa đồ linh hoạt >= 300mm)
       const targetBase = state.layout.placedModules.find(
-        (m) => m.instanceId === instanceId && m.code === 'S01'
+        (m) => m.instanceId === instanceId
       );
       if (targetBase) {
-        const validWidth = Math.max(830, Math.min(900, Math.round(customWidth)));
+        let validWidth = Math.round(customWidth);
+        if (targetBase.code === 'S01') {
+          validWidth = Math.max(830, Math.min(900, validWidth));
+        } else if (targetBase.code === 'T01') {
+          const spaceInfo = getBaseModuleSpaceInfo(instanceId, state.layout);
+          validWidth = Math.max(300, Math.min(spaceInfo.maxAllowedWidth, validWidth));
+        } else {
+          return;
+        }
+
         let curOffset = 0;
         const updatedModules = state.layout.placedModules.map((m) => {
           if (m.edgeId === targetBase.edgeId) {
@@ -1509,6 +1562,37 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
       const updatedLayout: KitchenLayout = {
         ...state.layout,
         placedUpperModules: updatedModules,
+        updatedAt: new Date().toISOString(),
+      };
+
+      set(pushHistory(state, updatedLayout));
+    },
+
+    autoFitBaseStorage: (instanceId) => {
+      const state = get();
+      const targetBase = state.layout.placedModules.find(
+        (m) => m.instanceId === instanceId
+      );
+      if (!targetBase || targetBase.code !== 'T01') return;
+
+      const spaceInfo = getBaseModuleSpaceInfo(instanceId, state.layout);
+      const fitWidth = spaceInfo.maxAllowedWidth;
+      if (fitWidth < 300) return;
+
+      let curOffset = 0;
+      const updatedModules = state.layout.placedModules.map((m) => {
+        if (m.edgeId === targetBase.edgeId) {
+          const w = m.instanceId === instanceId ? fitWidth : m.width;
+          const updatedM = { ...m, width: w, offset: curOffset };
+          curOffset += w;
+          return updatedM;
+        }
+        return m;
+      });
+
+      const updatedLayout: KitchenLayout = {
+        ...state.layout,
+        placedModules: updatedModules,
         updatedAt: new Date().toISOString(),
       };
 
