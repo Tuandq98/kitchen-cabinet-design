@@ -251,6 +251,95 @@ export const RightSidebar: React.FC = () => {
               </div>
             )}
 
+            {/* Khoang chậu rửa (S01): Tùy chỉnh linh hoạt từ 830mm đến 900mm (Khuyến nghị mặc định 850mm) */}
+            {selectedModule.code === 'S01' && (
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Chiều rộng chậu linh hoạt:</span>
+                  </label>
+                  <span className="text-[10px] text-sky-400 font-mono font-bold">
+                    830mm - 900mm (Chuẩn 850mm)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={selectedModule.width <= 830}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.max(830, selectedModule.width - 10)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Giảm 10mm"
+                  >
+                    -10
+                  </button>
+                  <button
+                    disabled={selectedModule.width <= 830}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.max(830, selectedModule.width - 5)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Giảm 5mm"
+                  >
+                    -5
+                  </button>
+                  <div className="relative flex-1">
+                    <input
+                      type="number"
+                      min={830}
+                      max={900}
+                      step={5}
+                      value={selectedModule.width}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (!isNaN(val) && val >= 830 && val <= 900) {
+                          updatePlacedModuleCustomWidth(selectedModule.instanceId, val);
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono font-bold text-sky-400 focus:outline-none focus:border-sky-500"
+                    />
+                    <span className="absolute right-2 top-1.5 text-[10px] text-slate-500 pointer-events-none">
+                      mm
+                    </span>
+                  </div>
+                  <button
+                    disabled={selectedModule.width >= 900}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.min(900, selectedModule.width + 5)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Tăng 5mm"
+                  >
+                    +5
+                  </button>
+                  <button
+                    disabled={selectedModule.width >= 900}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.min(900, selectedModule.width + 10)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Tăng 10mm"
+                  >
+                    +10
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Chỉ khoang tủ chứa đồ tủ trên (UT01) mới được tùy chỉnh kích cỡ linh động (tối thiểu 300mm) */}
             {selectedModule.code === 'UT01' && (
               <div className="space-y-2 pt-2 border-t border-slate-800">

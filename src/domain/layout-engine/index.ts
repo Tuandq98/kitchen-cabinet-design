@@ -969,7 +969,8 @@ export class LayoutEngine {
 
       // 1. Khoang hút mùi thẳng tim bếp
       if (cookOnEdge && hoodMod && hasUH01) {
-        const hoodW = cookOnEdge.width >= 800 ? 810 : 710;
+        const defaultHoodVar = hoodMod.variants.find((v) => v.isDefault) || hoodMod.variants[0];
+        const hoodW = defaultHoodVar ? defaultHoodVar.width : 710;
         const cookCenter = cookOnEdge.offset + cookOnEdge.width / 2;
         const hoodOffset = Math.round(cookCenter - hoodW / 2);
         // Đảm bảo nằm trong khoảng mở

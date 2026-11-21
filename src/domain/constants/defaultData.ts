@@ -8,10 +8,13 @@ export const DEFAULT_MODULES: KitchenModule[] = [
     category: 'cooking',
     description: 'Khoang đặt bếp từ/gas và hút mùi phía trên, kèm ngăn kéo gia vị hoặc lò bên dưới',
     color: '#ef4444', // Red-500
+    minWidth: 700,
+    maxWidth: 900,
     variants: [
-      { id: 'var-b01-600', width: 600, depth: 600, height: 850, isDefault: true },
+      { id: 'var-b01-800', width: 800, depth: 600, height: 850, isDefault: true },
       { id: 'var-b01-700', width: 700, depth: 600, height: 850 },
-      { id: 'var-b01-800', width: 800, depth: 600, height: 850 },
+      { id: 'var-b01-750', width: 750, depth: 600, height: 850 },
+      { id: 'var-b01-850', width: 850, depth: 600, height: 850 },
       { id: 'var-b01-900', width: 900, depth: 600, height: 850 },
     ],
     metadata: {
@@ -28,11 +31,12 @@ export const DEFAULT_MODULES: KitchenModule[] = [
     category: 'sink',
     description: 'Khoang chậu rửa đôi/đơn, vòi nước nóng lạnh và khoang chứa máy lọc nước',
     color: '#0ea5e9', // Sky-500
+    minWidth: 830,
+    maxWidth: 900,
     variants: [
-      { id: 'var-s01-800', width: 800, depth: 600, height: 850, isDefault: true },
-      { id: 'var-s01-700', width: 700, depth: 600, height: 850 },
+      { id: 'var-s01-850', width: 850, depth: 600, height: 850, isDefault: true },
+      { id: 'var-s01-830', width: 830, depth: 600, height: 850 },
       { id: 'var-s01-900', width: 900, depth: 600, height: 850 },
-      { id: 'var-s01-1000', width: 1000, depth: 600, height: 850 },
     ],
     metadata: {
       isSink: true,
@@ -67,9 +71,10 @@ export const DEFAULT_MODULES: KitchenModule[] = [
     category: 'appliance',
     description: 'Khoang máy rửa bát âm tủ toàn phần hoặc bán phần',
     color: '#8b5cf6', // Violet-500
+    minWidth: 610,
+    maxWidth: 610,
     variants: [
-      { id: 'var-d01-600', width: 600, depth: 600, height: 850, isDefault: true },
-      { id: 'var-d01-450', width: 450, depth: 600, height: 850 },
+      { id: 'var-d01-610', width: 610, depth: 600, height: 850, isDefault: true },
     ],
     metadata: {
       isDishwasher: true,
@@ -170,9 +175,10 @@ export const DEFAULT_MODULES: KitchenModule[] = [
     category: 'prep',
     description: 'Khoang thùng gạo nút nhấn âm tủ tiện lợi (chỉ thiết kế khi có yêu cầu)',
     color: '#f97316', // Orange-500
+    minWidth: 300,
+    maxWidth: 300,
     variants: [
       { id: 'var-r01-300', width: 300, depth: 600, height: 850, isDefault: true },
-      { id: 'var-r01-250', width: 250, depth: 600, height: 850 },
     ],
     metadata: {
       isRiceDispenser: true,
@@ -338,8 +344,8 @@ export const DEFAULT_MODULES: KitchenModule[] = [
     description: 'Khoang tủ trên lắp máy hút mùi âm tủ hoặc kính cong gắn tường thẳng tim bếp nấu',
     color: '#e11d48', // Rose-600
     variants: [
-      { id: 'var-uh01-810', width: 810, depth: 350, height: 750, isDefault: true },
-      { id: 'var-uh01-710', width: 710, depth: 350, height: 750 },
+      { id: 'var-uh01-710', width: 710, depth: 350, height: 750, isDefault: true },
+      { id: 'var-uh01-810', width: 810, depth: 350, height: 750 },
       { id: 'var-uh01-910', width: 910, depth: 350, height: 750 },
     ],
     metadata: {

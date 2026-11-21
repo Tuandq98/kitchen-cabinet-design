@@ -1384,15 +1384,22 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
         const variant = catalogMod.variants.find((v) => v.id === variantId);
         if (!variant) return;
 
+        let curOffset = 0;
         const updatedModules = state.layout.placedModules.map((m) => {
-          if (m.instanceId === instanceId) {
-            return {
+          if (m.edgeId === targetBase.edgeId) {
+            const isTarget = m.instanceId === instanceId;
+            const w = isTarget ? variant.width : m.width;
+            const variantIdToUse = isTarget ? variant.id : m.variantId;
+            const updatedM = {
               ...m,
-              variantId: variant.id,
-              width: variant.width,
-              depth: variant.depth,
-              height: variant.height,
+              variantId: variantIdToUse,
+              width: w,
+              depth: isTarget ? variant.depth : m.depth,
+              height: isTarget ? variant.height : m.height,
+              offset: curOffset,
             };
+            curOffset += w;
+            return updatedM;
           }
           return m;
         });
@@ -1450,7 +1457,33 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
 
     updatePlacedModuleCustomWidth: (instanceId, customWidth) => {
       const state = get();
-      // Chỉ cho phép khoang tủ chứa đồ tủ trên (UT01) tùy chỉnh kích cỡ
+
+      // 1. Khoang chậu rửa tủ dưới (S01): Tùy chỉnh linh hoạt từ 830mm đến 900mm (Chuẩn mặc định 850mm)
+      const targetBase = state.layout.placedModules.find(
+        (m) => m.instanceId === instanceId && m.code === 'S01'
+      );
+      if (targetBase) {
+        const validWidth = Math.max(830, Math.min(900, Math.round(customWidth)));
+        let curOffset = 0;
+        const updatedModules = state.layout.placedModules.map((m) => {
+          if (m.edgeId === targetBase.edgeId) {
+            const w = m.instanceId === instanceId ? validWidth : m.width;
+            const updatedM = { ...m, width: w, offset: curOffset };
+            curOffset += w;
+            return updatedM;
+          }
+          return m;
+        });
+        const updatedLayout: KitchenLayout = {
+          ...state.layout,
+          placedModules: updatedModules,
+          updatedAt: new Date().toISOString(),
+        };
+        set(pushHistory(state, updatedLayout));
+        return;
+      }
+
+      // 2. Khoang tủ chứa đồ tủ trên (UT01) tùy chỉnh kích cỡ linh động
       const targetUpper = (state.layout.placedUpperModules || []).find(
         (m) => m.instanceId === instanceId
       );
