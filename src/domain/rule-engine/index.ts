@@ -866,7 +866,7 @@ export class RuleEngine {
         ...(layout.placedUpperModules || []),
       ];
       const invalidCornerMods = allModules.filter(
-        (m) => m.code === 'K01' || m.category === 'corner'
+        (m) => m.code === 'K01' || m.code === 'UK01' || m.category === 'corner'
       );
 
       for (const cm of invalidCornerMods) {

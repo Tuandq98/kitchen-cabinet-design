@@ -22,6 +22,12 @@ export interface CornerBox {
   width: number;
   height: number;
   label: string;
+  orientation?: 'edge_A' | 'edge_B' | 'edge_C';
+  tier?: 'base' | 'upper';
+  deadWidth?: number;
+  deadHeight?: number;
+  usableWidth?: number;
+  usableHeight?: number;
 }
 
 export interface UpperGapBox {
@@ -143,17 +149,33 @@ export function computeUpperGaps(
     const edgeId = edge.id;
     const occupied: { start: number; end: number }[] = [];
 
-    // 1. Góc chết tủ trên
+    // 1. Góc chết / khoang góc tủ trên (730-780mm theo cạnh quay về, upperDepth theo cạnh đối diện)
     if (layout.shape === 'L') {
-      if (edgeId === 'edge_A' || edgeId === 'edge_B') {
-        occupied.push({ start: 0, end: upperDepth });
+      const orientAB = layout.cornerOrientationAB || 'edge_A';
+      const wUpperAB = layout.cornerWidthUpperAB || 750;
+      if (edgeId === 'edge_A') {
+        const occWidth = orientAB === 'edge_A' ? wUpperAB : upperDepth;
+        occupied.push({ start: 0, end: occWidth });
+      } else if (edgeId === 'edge_B') {
+        const occWidth = orientAB === 'edge_B' ? wUpperAB : upperDepth;
+        occupied.push({ start: 0, end: occWidth });
       }
     } else if (layout.shape === 'U') {
+      const orientAB = layout.cornerOrientationAB || 'edge_A';
+      const wUpperAB = layout.cornerWidthUpperAB || 750;
+      const orientAC = layout.cornerOrientationAC || 'edge_A';
+      const wUpperAC = layout.cornerWidthUpperAC || 750;
       if (edgeId === 'edge_A') {
-        occupied.push({ start: 0, end: upperDepth });
-        occupied.push({ start: edge.length - upperDepth, end: edge.length });
-      } else {
-        occupied.push({ start: 0, end: upperDepth });
+        const occAB = orientAB === 'edge_A' ? wUpperAB : upperDepth;
+        const occAC = orientAC === 'edge_A' ? wUpperAC : upperDepth;
+        occupied.push({ start: 0, end: occAB });
+        occupied.push({ start: edge.length - occAC, end: edge.length });
+      } else if (edgeId === 'edge_B') {
+        const occAB = orientAB === 'edge_B' ? wUpperAB : upperDepth;
+        occupied.push({ start: 0, end: occAB });
+      } else if (edgeId === 'edge_C') {
+        const occAC = orientAC === 'edge_C' ? wUpperAC : upperDepth;
+        occupied.push({ start: 0, end: occAC });
       }
     }
 
@@ -301,13 +323,16 @@ export function computeBaseGaps(
   } else if (layout.shape === 'L') {
     const lengthA = layout.edgeA.length;
     const lengthB = layout.edgeB ? layout.edgeB.length : 2400;
+    const orientAB = layout.cornerOrientationAB || 'edge_A';
+    const wBaseAB = layout.cornerWidthBaseAB || 1000;
 
-    // Cạnh A: bắt đầu sau góc depthB
+    // Cạnh A: bắt đầu sau góc (wBaseAB nếu quay về A, depthB nếu quay về B)
+    const ptrA_start = orientAB === 'edge_A' ? wBaseAB : depthB;
     const modulesA = layout.placedModules
       .filter((m) => m.edgeId === 'edge_A')
       .sort((a, b) => a.offset - b.offset);
 
-    let ptrA = depthB;
+    let ptrA = ptrA_start;
     for (const m of modulesA) {
       if (m.offset > ptrA + 5) {
         const gapMm = m.offset - ptrA;
@@ -346,12 +371,13 @@ export function computeBaseGaps(
       }
     }
 
-    // Cạnh B: bắt đầu sau góc depthA (chạy dọc từ trên xuống)
+    // Cạnh B: bắt đầu sau góc (wBaseAB nếu quay về B, depthA nếu quay về A)
+    const ptrB_start = orientAB === 'edge_B' ? wBaseAB : depthA;
     const modulesB = layout.placedModules
       .filter((m) => m.edgeId === 'edge_B')
       .sort((a, b) => a.offset - b.offset);
 
-    let ptrB = depthA;
+    let ptrB = ptrB_start;
     for (const m of modulesB) {
       if (m.offset > ptrB + 5) {
         const gapMm = m.offset - ptrB;
@@ -393,13 +419,22 @@ export function computeBaseGaps(
     const lengthA = layout.edgeA.length;
     const lengthB = layout.edgeB ? layout.edgeB.length : 2400;
     const lengthC = layout.edgeC ? layout.edgeC.length : 2400;
+    const orientAB = layout.cornerOrientationAB || 'edge_A';
+    const wBaseAB = layout.cornerWidthBaseAB || 1000;
+    const orientAC = layout.cornerOrientationAC || 'edge_A';
+    const wBaseAC = layout.cornerWidthBaseAC || 1000;
+
+    const takesAB_on_A = orientAB === 'edge_A' ? wBaseAB : depthB;
+    const takesAC_on_A = orientAC === 'edge_A' ? wBaseAC : depthC;
+    const takesAB_on_B = orientAB === 'edge_B' ? wBaseAB : depthA;
+    const takesAC_on_C = orientAC === 'edge_C' ? wBaseAC : depthA;
 
     // Cạnh B (trái)
     const modulesB = layout.placedModules
       .filter((m) => m.edgeId === 'edge_B')
       .sort((a, b) => a.offset - b.offset);
 
-    let ptrB = depthA;
+    let ptrB = takesAB_on_B;
     for (const m of modulesB) {
       if (m.offset > ptrB + 5) {
         const gapMm = m.offset - ptrB;
@@ -439,12 +474,12 @@ export function computeBaseGaps(
     }
 
     // Cạnh A (giữa)
-    const endA = lengthA - depthC;
+    const endA = lengthA - takesAC_on_A;
     const modulesA = layout.placedModules
       .filter((m) => m.edgeId === 'edge_A')
       .sort((a, b) => a.offset - b.offset);
 
-    let ptrA = depthB;
+    let ptrA = takesAB_on_A;
     for (const m of modulesA) {
       if (m.offset > ptrA + 5) {
         const gapMm = m.offset - ptrA;
@@ -488,7 +523,7 @@ export function computeBaseGaps(
       .filter((m) => m.edgeId === 'edge_C')
       .sort((a, b) => a.offset - b.offset);
 
-    let ptrC = depthA;
+    let ptrC = takesAC_on_C;
     for (const m of modulesC) {
       if (m.offset > ptrC + 5) {
         const gapMm = m.offset - ptrC;
@@ -644,6 +679,9 @@ export function calculateLayout2D(
     // Bếp chữ L:
     const lengthA = layout.edgeA.length;
     const lengthB = layout.edgeB ? layout.edgeB.length : 2400;
+    const orientAB = layout.cornerOrientationAB || 'edge_A';
+    const wBaseAB = layout.cornerWidthBaseAB || 1000;
+    const wUpperAB = layout.cornerWidthUpperAB || 750;
 
     if (is2Row) {
       // 2 Dòng song song tách biệt:
@@ -652,30 +690,74 @@ export function calculateLayout2D(
       const baseRowY = upperDepth + GAP; // 500
       const upperOffsetX = -(upperDepth + GAP); // -500
 
-      corners.push({
-        id: 'corner_AB',
-        x: 0,
-        y: baseRowY,
-        width: depthB,
-        height: depthA,
-        label: 'Góc giao AB (600x600)',
-      });
+      if (orientAB === 'edge_A') {
+        corners.push({
+          id: 'corner_AB',
+          x: 0,
+          y: baseRowY,
+          width: wBaseAB,
+          height: depthA,
+          label: `Góc nối AB (${wBaseAB}x${depthA}) - Quay Cạnh A`,
+          orientation: 'edge_A',
+          tier: 'base',
+          deadWidth: depthB,
+          deadHeight: depthA,
+          usableWidth: wBaseAB - depthB,
+          usableHeight: depthA,
+        });
 
-      upperCorners.push({
-        id: 'upper_corner_AB',
-        x: upperOffsetX,
-        y: 0,
-        width: upperDepth,
-        height: upperDepth,
-        label: `Góc tủ trên (${upperDepth}x${upperDepth})`,
-      });
+        upperCorners.push({
+          id: 'upper_corner_AB',
+          x: upperOffsetX,
+          y: 0,
+          width: wUpperAB,
+          height: upperDepth,
+          label: `Góc tủ trên (${wUpperAB}x${upperDepth}) - Quay Cạnh A`,
+          orientation: 'edge_A',
+          tier: 'upper',
+          deadWidth: upperDepth,
+          deadHeight: upperDepth,
+          usableWidth: wUpperAB - upperDepth,
+          usableHeight: upperDepth,
+        });
+      } else {
+        corners.push({
+          id: 'corner_AB',
+          x: 0,
+          y: baseRowY,
+          width: depthB,
+          height: wBaseAB,
+          label: `Góc nối AB (${depthB}x${wBaseAB}) - Quay Cạnh B`,
+          orientation: 'edge_B',
+          tier: 'base',
+          deadWidth: depthB,
+          deadHeight: depthA,
+          usableWidth: depthB,
+          usableHeight: wBaseAB - depthA,
+        });
 
-      // Modules cạnh A tủ dưới (chạy ngang sang phải từ depthB)
+        upperCorners.push({
+          id: 'upper_corner_AB',
+          x: upperOffsetX,
+          y: 0,
+          width: upperDepth,
+          height: wUpperAB,
+          label: `Góc tủ trên (${upperDepth}x${wUpperAB}) - Quay Cạnh B`,
+          orientation: 'edge_B',
+          tier: 'upper',
+          deadWidth: upperDepth,
+          deadHeight: upperDepth,
+          usableWidth: upperDepth,
+          usableHeight: wUpperAB - upperDepth,
+        });
+      }
+
+      // Modules cạnh A tủ dưới (chạy ngang sang phải từ điểm kết thúc góc)
       const modulesA = layout.placedModules
         .filter((m) => m.edgeId === 'edge_A')
         .sort((a, b) => a.positionIndex - b.positionIndex);
 
-      let currentX = depthB;
+      let currentX = orientAB === 'edge_A' ? wBaseAB : depthB;
       for (const m of modulesA) {
         const x = m.offset !== undefined ? m.offset : currentX;
         const y = baseRowY;
@@ -700,12 +782,12 @@ export function calculateLayout2D(
         currentX = x + w;
       }
 
-      // Modules cạnh B tủ dưới (chạy dọc xuống dưới từ baseRowY + depthA)
+      // Modules cạnh B tủ dưới (chạy dọc xuống dưới từ điểm kết thúc góc)
       const modulesB = layout.placedModules
         .filter((m) => m.edgeId === 'edge_B')
         .sort((a, b) => a.positionIndex - b.positionIndex);
 
-      let currentY = baseRowY + depthA;
+      let currentY = baseRowY + (orientAB === 'edge_B' ? wBaseAB : depthA);
       for (const m of modulesB) {
         const x = 0;
         const y = m.offset !== undefined ? baseRowY + m.offset : currentY;
@@ -735,7 +817,7 @@ export function calculateLayout2D(
         .filter((m) => m.edgeId === 'edge_A')
         .sort((a, b) => a.positionIndex - b.positionIndex);
 
-      let currentUpperXA = upperDepth;
+      let currentUpperXA = orientAB === 'edge_A' ? wUpperAB : upperDepth;
       for (const m of upperModulesA) {
         const x = m.offset !== undefined ? m.offset : currentUpperXA;
         const y = 0;
@@ -765,7 +847,7 @@ export function calculateLayout2D(
         .filter((m) => m.edgeId === 'edge_B')
         .sort((a, b) => a.positionIndex - b.positionIndex);
 
-      let currentUpperYB = upperDepth;
+      let currentUpperYB = orientAB === 'edge_B' ? wUpperAB : upperDepth;
       for (const m of upperModulesB) {
         const x = upperOffsetX;
         const y = m.offset !== undefined ? m.offset : currentUpperYB;
@@ -796,7 +878,7 @@ export function calculateLayout2D(
         upperModules: upperModules2D,
         upperCorners,
         upperGaps: computeUpperGaps(layout, tier),
-      baseGaps: computeBaseGaps(layout, tier),
+        baseGaps: computeBaseGaps(layout, tier),
         totalWidth: lengthA + Math.abs(upperOffsetX),
         totalHeight: Math.max(lengthB + baseRowY, lengthB),
         minX: upperOffsetX,
@@ -811,30 +893,76 @@ export function calculateLayout2D(
       const curDepthB = isUpper ? upperDepth : depthB;
 
       if (!isUpper) {
-        corners.push({
-          id: 'corner_AB',
-          x: 0,
-          y: 0,
-          width: depthB,
-          height: depthA,
-          label: 'Góc giao AB (600x600)',
-        });
+        if (orientAB === 'edge_A') {
+          corners.push({
+            id: 'corner_AB',
+            x: 0,
+            y: 0,
+            width: wBaseAB,
+            height: depthA,
+            label: `Góc nối AB (${wBaseAB}x${depthA}) - Quay Cạnh A`,
+            orientation: 'edge_A',
+            tier: 'base',
+            deadWidth: depthB,
+            deadHeight: depthA,
+            usableWidth: wBaseAB - depthB,
+            usableHeight: depthA,
+          });
+        } else {
+          corners.push({
+            id: 'corner_AB',
+            x: 0,
+            y: 0,
+            width: depthB,
+            height: wBaseAB,
+            label: `Góc nối AB (${depthB}x${wBaseAB}) - Quay Cạnh B`,
+            orientation: 'edge_B',
+            tier: 'base',
+            deadWidth: depthB,
+            deadHeight: depthA,
+            usableWidth: depthB,
+            usableHeight: wBaseAB - depthA,
+          });
+        }
       } else {
-        upperCorners.push({
-          id: 'upper_corner_AB',
-          x: 0,
-          y: 0,
-          width: upperDepth,
-          height: upperDepth,
-          label: `Góc tủ trên (${upperDepth}x${upperDepth})`,
-        });
+        if (orientAB === 'edge_A') {
+          upperCorners.push({
+            id: 'upper_corner_AB',
+            x: 0,
+            y: 0,
+            width: wUpperAB,
+            height: upperDepth,
+            label: `Góc tủ trên (${wUpperAB}x${upperDepth}) - Quay Cạnh A`,
+            orientation: 'edge_A',
+            tier: 'upper',
+            deadWidth: upperDepth,
+            deadHeight: upperDepth,
+            usableWidth: wUpperAB - upperDepth,
+            usableHeight: upperDepth,
+          });
+        } else {
+          upperCorners.push({
+            id: 'upper_corner_AB',
+            x: 0,
+            y: 0,
+            width: upperDepth,
+            height: wUpperAB,
+            label: `Góc tủ trên (${upperDepth}x${wUpperAB}) - Quay Cạnh B`,
+            orientation: 'edge_B',
+            tier: 'upper',
+            deadWidth: upperDepth,
+            deadHeight: upperDepth,
+            usableWidth: upperDepth,
+            usableHeight: wUpperAB - upperDepth,
+          });
+        }
       }
 
       const modulesA = layout.placedModules
         .filter((m) => m.edgeId === 'edge_A')
         .sort((a, b) => a.positionIndex - b.positionIndex);
 
-      let currentX = curDepthB;
+      let currentX = orientAB === 'edge_A' ? wBaseAB : curDepthB;
       for (const m of modulesA) {
         const x = m.offset !== undefined ? m.offset : currentX;
         const y = 0;
@@ -862,7 +990,7 @@ export function calculateLayout2D(
         .filter((m) => m.edgeId === 'edge_B')
         .sort((a, b) => a.positionIndex - b.positionIndex);
 
-      let currentY = curDepthA;
+      let currentY = orientAB === 'edge_B' ? wBaseAB : curDepthA;
       for (const m of modulesB) {
         const x = 0;
         const y = m.offset !== undefined ? m.offset : currentY;
@@ -890,7 +1018,7 @@ export function calculateLayout2D(
         .filter((m) => m.edgeId === 'edge_A')
         .sort((a, b) => a.positionIndex - b.positionIndex);
 
-      let currentUpperXA = upperDepth;
+      let currentUpperXA = orientAB === 'edge_A' ? wUpperAB : upperDepth;
       for (const m of upperModulesA) {
         const x = m.offset !== undefined ? m.offset : currentUpperXA;
         const y = 0;
@@ -918,7 +1046,7 @@ export function calculateLayout2D(
         .filter((m) => m.edgeId === 'edge_B')
         .sort((a, b) => a.positionIndex - b.positionIndex);
 
-      let currentUpperYB = upperDepth;
+      let currentUpperYB = orientAB === 'edge_B' ? wUpperAB : upperDepth;
       for (const m of upperModulesB) {
         const x = 0;
         const y = m.offset !== undefined ? m.offset : currentUpperYB;
@@ -948,7 +1076,7 @@ export function calculateLayout2D(
         upperModules: upperModules2D,
         upperCorners,
         upperGaps: computeUpperGaps(layout, tier),
-      baseGaps: computeBaseGaps(layout, tier),
+        baseGaps: computeBaseGaps(layout, tier),
         totalWidth: lengthA,
         totalHeight: lengthB,
         minX: 0,
@@ -963,54 +1091,150 @@ export function calculateLayout2D(
   const lengthA = layout.edgeA.length;
   const lengthB = layout.edgeB ? layout.edgeB.length : 2400;
   const lengthC = layout.edgeC ? layout.edgeC.length : 2400;
+  const orientAB = layout.cornerOrientationAB || 'edge_A';
+  const wBaseAB = layout.cornerWidthBaseAB || 1000;
+  const wUpperAB = layout.cornerWidthUpperAB || 750;
+  const orientAC = layout.cornerOrientationAC || 'edge_A';
+  const wBaseAC = layout.cornerWidthBaseAC || 1000;
+  const wUpperAC = layout.cornerWidthUpperAC || 750;
 
   if (is2Row) {
     const baseRowY = upperDepth + GAP; // 500
     const upperOffsetX = -(upperDepth + GAP); // -500
     const upperOffsetCX = lengthA + GAP;
 
-    corners.push({
-      id: 'corner_AB',
-      x: 0,
-      y: baseRowY,
-      width: depthB,
-      height: depthA,
-      label: 'Góc AB (600x600)',
-    });
+    // Corner AB
+    if (orientAB === 'edge_A') {
+      corners.push({
+        id: 'corner_AB',
+        x: 0,
+        y: baseRowY,
+        width: wBaseAB,
+        height: depthA,
+        label: `Góc AB (${wBaseAB}x${depthA}) - Quay Cạnh A`,
+        orientation: 'edge_A',
+        tier: 'base',
+        deadWidth: depthB,
+        deadHeight: depthA,
+        usableWidth: wBaseAB - depthB,
+        usableHeight: depthA,
+      });
 
-    corners.push({
-      id: 'corner_AC',
-      x: lengthA - depthC,
-      y: baseRowY,
-      width: depthC,
-      height: depthA,
-      label: 'Góc AC (600x600)',
-    });
+      upperCorners.push({
+        id: 'upper_corner_AB',
+        x: upperOffsetX,
+        y: 0,
+        width: wUpperAB,
+        height: upperDepth,
+        label: `Góc tủ trên AB - Quay Cạnh A`,
+        orientation: 'edge_A',
+        tier: 'upper',
+        deadWidth: upperDepth,
+        deadHeight: upperDepth,
+        usableWidth: wUpperAB - upperDepth,
+        usableHeight: upperDepth,
+      });
+    } else {
+      corners.push({
+        id: 'corner_AB',
+        x: 0,
+        y: baseRowY,
+        width: depthB,
+        height: wBaseAB,
+        label: `Góc AB (${depthB}x${wBaseAB}) - Quay Cạnh B`,
+        orientation: 'edge_B',
+        tier: 'base',
+        deadWidth: depthB,
+        deadHeight: depthA,
+        usableWidth: depthB,
+        usableHeight: wBaseAB - depthA,
+      });
 
-    upperCorners.push({
-      id: 'upper_corner_AB',
-      x: upperOffsetX,
-      y: 0,
-      width: upperDepth,
-      height: upperDepth,
-      label: 'Góc tủ trên AB',
-    });
+      upperCorners.push({
+        id: 'upper_corner_AB',
+        x: upperOffsetX,
+        y: 0,
+        width: upperDepth,
+        height: wUpperAB,
+        label: `Góc tủ trên AB - Quay Cạnh B`,
+        orientation: 'edge_B',
+        tier: 'upper',
+        deadWidth: upperDepth,
+        deadHeight: upperDepth,
+        usableWidth: upperDepth,
+        usableHeight: wUpperAB - upperDepth,
+      });
+    }
 
-    upperCorners.push({
-      id: 'upper_corner_AC',
-      x: upperOffsetCX,
-      y: 0,
-      width: upperDepth,
-      height: upperDepth,
-      label: 'Góc tủ trên AC',
-    });
+    // Corner AC
+    if (orientAC === 'edge_A') {
+      corners.push({
+        id: 'corner_AC',
+        x: lengthA - wBaseAC,
+        y: baseRowY,
+        width: wBaseAC,
+        height: depthA,
+        label: `Góc AC (${wBaseAC}x${depthA}) - Quay Cạnh A`,
+        orientation: 'edge_A',
+        tier: 'base',
+        deadWidth: depthC,
+        deadHeight: depthA,
+        usableWidth: wBaseAC - depthC,
+        usableHeight: depthA,
+      });
+
+      upperCorners.push({
+        id: 'upper_corner_AC',
+        x: upperOffsetCX,
+        y: 0,
+        width: wUpperAC,
+        height: upperDepth,
+        label: `Góc tủ trên AC - Quay Cạnh A`,
+        orientation: 'edge_A',
+        tier: 'upper',
+        deadWidth: upperDepth,
+        deadHeight: upperDepth,
+        usableWidth: wUpperAC - upperDepth,
+        usableHeight: upperDepth,
+      });
+    } else {
+      corners.push({
+        id: 'corner_AC',
+        x: lengthA - depthC,
+        y: baseRowY,
+        width: depthC,
+        height: wBaseAC,
+        label: `Góc AC (${depthC}x${wBaseAC}) - Quay Cạnh C`,
+        orientation: 'edge_C',
+        tier: 'base',
+        deadWidth: depthC,
+        deadHeight: depthA,
+        usableWidth: depthC,
+        usableHeight: wBaseAC - depthA,
+      });
+
+      upperCorners.push({
+        id: 'upper_corner_AC',
+        x: upperOffsetCX,
+        y: 0,
+        width: upperDepth,
+        height: wUpperAC,
+        label: `Góc tủ trên AC - Quay Cạnh C`,
+        orientation: 'edge_C',
+        tier: 'upper',
+        deadWidth: upperDepth,
+        deadHeight: upperDepth,
+        usableWidth: upperDepth,
+        usableHeight: wUpperAC - upperDepth,
+      });
+    }
 
     // Modules Cạnh B (bên trái)
     const modulesB = layout.placedModules
       .filter((m) => m.edgeId === 'edge_B')
       .sort((a, b) => a.positionIndex - b.positionIndex);
 
-    let currentYB = baseRowY + depthA;
+    let currentYB = baseRowY + (orientAB === 'edge_B' ? wBaseAB : depthA);
     for (const m of modulesB) {
       const y = m.offset !== undefined ? baseRowY + m.offset : currentYB;
       modules2D.push({
@@ -1035,7 +1259,7 @@ export function calculateLayout2D(
       .filter((m) => m.edgeId === 'edge_A')
       .sort((a, b) => a.positionIndex - b.positionIndex);
 
-    let currentXA = depthB;
+    let currentXA = orientAB === 'edge_A' ? wBaseAB : depthB;
     for (const m of modulesA) {
       const x = m.offset !== undefined ? m.offset : currentXA;
       modules2D.push({
@@ -1060,7 +1284,7 @@ export function calculateLayout2D(
       .filter((m) => m.edgeId === 'edge_C')
       .sort((a, b) => a.positionIndex - b.positionIndex);
 
-    let currentYC = baseRowY + depthA;
+    let currentYC = baseRowY + (orientAC === 'edge_C' ? wBaseAC : depthA);
     for (const m of modulesC) {
       const y = m.offset !== undefined ? baseRowY + m.offset : currentYC;
       modules2D.push({
@@ -1085,7 +1309,7 @@ export function calculateLayout2D(
       .filter((m) => m.edgeId === 'edge_B')
       .sort((a, b) => a.positionIndex - b.positionIndex);
 
-    let curUpperYB = upperDepth;
+    let curUpperYB = orientAB === 'edge_B' ? wUpperAB : upperDepth;
     for (const m of upperModulesB) {
       const y = m.offset !== undefined ? m.offset : curUpperYB;
       upperModules2D.push({
@@ -1109,7 +1333,7 @@ export function calculateLayout2D(
       .filter((m) => m.edgeId === 'edge_A')
       .sort((a, b) => a.positionIndex - b.positionIndex);
 
-    let curUpperXA = upperDepth;
+    let curUpperXA = orientAB === 'edge_A' ? wUpperAB : upperDepth;
     for (const m of upperModulesA) {
       const x = m.offset !== undefined ? m.offset : curUpperXA;
       upperModules2D.push({
@@ -1133,7 +1357,7 @@ export function calculateLayout2D(
       .filter((m) => m.edgeId === 'edge_C')
       .sort((a, b) => a.positionIndex - b.positionIndex);
 
-    let curUpperYC = upperDepth;
+    let curUpperYC = orientAC === 'edge_C' ? wUpperAC : upperDepth;
     for (const m of upperModulesC) {
       const y = m.offset !== undefined ? m.offset : curUpperYC;
       upperModules2D.push({
@@ -1175,48 +1399,140 @@ export function calculateLayout2D(
     const curDepthC = isUpper ? upperDepth : depthC;
 
     if (!isUpper) {
-      corners.push({
-        id: 'corner_AB',
-        x: 0,
-        y: 0,
-        width: depthB,
-        height: depthA,
-        label: 'Góc AB (600x600)',
-      });
+      if (orientAB === 'edge_A') {
+        corners.push({
+          id: 'corner_AB',
+          x: 0,
+          y: 0,
+          width: wBaseAB,
+          height: depthA,
+          label: `Góc AB (${wBaseAB}x${depthA}) - Quay Cạnh A`,
+          orientation: 'edge_A',
+          tier: 'base',
+          deadWidth: depthB,
+          deadHeight: depthA,
+          usableWidth: wBaseAB - depthB,
+          usableHeight: depthA,
+        });
+      } else {
+        corners.push({
+          id: 'corner_AB',
+          x: 0,
+          y: 0,
+          width: depthB,
+          height: wBaseAB,
+          label: `Góc AB (${depthB}x${wBaseAB}) - Quay Cạnh B`,
+          orientation: 'edge_B',
+          tier: 'base',
+          deadWidth: depthB,
+          deadHeight: depthA,
+          usableWidth: depthB,
+          usableHeight: wBaseAB - depthA,
+        });
+      }
 
-      corners.push({
-        id: 'corner_AC',
-        x: lengthA - depthC,
-        y: 0,
-        width: depthC,
-        height: depthA,
-        label: 'Góc AC (600x600)',
-      });
+      if (orientAC === 'edge_A') {
+        corners.push({
+          id: 'corner_AC',
+          x: lengthA - wBaseAC,
+          y: 0,
+          width: wBaseAC,
+          height: depthA,
+          label: `Góc AC (${wBaseAC}x${depthA}) - Quay Cạnh A`,
+          orientation: 'edge_A',
+          tier: 'base',
+          deadWidth: depthC,
+          deadHeight: depthA,
+          usableWidth: wBaseAC - depthC,
+          usableHeight: depthA,
+        });
+      } else {
+        corners.push({
+          id: 'corner_AC',
+          x: lengthA - depthC,
+          y: 0,
+          width: depthC,
+          height: wBaseAC,
+          label: `Góc AC (${depthC}x${wBaseAC}) - Quay Cạnh C`,
+          orientation: 'edge_C',
+          tier: 'base',
+          deadWidth: depthC,
+          deadHeight: depthA,
+          usableWidth: depthC,
+          usableHeight: wBaseAC - depthA,
+        });
+      }
     } else {
-      upperCorners.push({
-        id: 'upper_corner_AB',
-        x: 0,
-        y: 0,
-        width: upperDepth,
-        height: upperDepth,
-        label: 'Góc tủ trên AB',
-      });
+      if (orientAB === 'edge_A') {
+        upperCorners.push({
+          id: 'upper_corner_AB',
+          x: 0,
+          y: 0,
+          width: wUpperAB,
+          height: upperDepth,
+          label: 'Góc tủ trên AB - Quay Cạnh A',
+          orientation: 'edge_A',
+          tier: 'upper',
+          deadWidth: upperDepth,
+          deadHeight: upperDepth,
+          usableWidth: wUpperAB - upperDepth,
+          usableHeight: upperDepth,
+        });
+      } else {
+        upperCorners.push({
+          id: 'upper_corner_AB',
+          x: 0,
+          y: 0,
+          width: upperDepth,
+          height: wUpperAB,
+          label: 'Góc tủ trên AB - Quay Cạnh B',
+          orientation: 'edge_B',
+          tier: 'upper',
+          deadWidth: upperDepth,
+          deadHeight: upperDepth,
+          usableWidth: upperDepth,
+          usableHeight: wUpperAB - upperDepth,
+        });
+      }
 
-      upperCorners.push({
-        id: 'upper_corner_AC',
-        x: lengthA - upperDepth,
-        y: 0,
-        width: upperDepth,
-        height: upperDepth,
-        label: 'Góc tủ trên AC',
-      });
+      if (orientAC === 'edge_A') {
+        upperCorners.push({
+          id: 'upper_corner_AC',
+          x: lengthA - wUpperAC,
+          y: 0,
+          width: wUpperAC,
+          height: upperDepth,
+          label: 'Góc tủ trên AC - Quay Cạnh A',
+          orientation: 'edge_A',
+          tier: 'upper',
+          deadWidth: upperDepth,
+          deadHeight: upperDepth,
+          usableWidth: wUpperAC - upperDepth,
+          usableHeight: upperDepth,
+        });
+      } else {
+        upperCorners.push({
+          id: 'upper_corner_AC',
+          x: lengthA - upperDepth,
+          y: 0,
+          width: upperDepth,
+          height: wUpperAC,
+          label: 'Góc tủ trên AC - Quay Cạnh C',
+          orientation: 'edge_C',
+          tier: 'upper',
+          deadWidth: upperDepth,
+          deadHeight: upperDepth,
+          usableWidth: upperDepth,
+          usableHeight: wUpperAC - upperDepth,
+        });
+      }
     }
 
     const modulesB = layout.placedModules
       .filter((m) => m.edgeId === 'edge_B')
       .sort((a, b) => a.positionIndex - b.positionIndex);
 
-    let currentYB = curDepthA;
+    let currentYB = orientAB === 'edge_B' ? wBaseAB : curDepthA;
     for (const m of modulesB) {
       modules2D.push({
         instanceId: m.instanceId,
@@ -1239,7 +1555,7 @@ export function calculateLayout2D(
       .filter((m) => m.edgeId === 'edge_A')
       .sort((a, b) => a.positionIndex - b.positionIndex);
 
-    let currentXA = curDepthB;
+    let currentXA = orientAB === 'edge_A' ? wBaseAB : curDepthB;
     for (const m of modulesA) {
       modules2D.push({
         instanceId: m.instanceId,
@@ -1262,7 +1578,7 @@ export function calculateLayout2D(
       .filter((m) => m.edgeId === 'edge_C')
       .sort((a, b) => a.positionIndex - b.positionIndex);
 
-    let currentYC = curDepthA;
+    let currentYC = orientAC === 'edge_C' ? wBaseAC : curDepthA;
     for (const m of modulesC) {
       modules2D.push({
         instanceId: m.instanceId,
@@ -1285,7 +1601,7 @@ export function calculateLayout2D(
       .filter((m) => m.edgeId === 'edge_B')
       .sort((a, b) => a.positionIndex - b.positionIndex);
 
-    let curUpperYB = upperDepth;
+    let curUpperYB = orientAB === 'edge_B' ? wUpperAB : upperDepth;
     for (const m of upperModulesB) {
       const y = m.offset !== undefined ? m.offset : curUpperYB;
       upperModules2D.push({
@@ -1309,7 +1625,7 @@ export function calculateLayout2D(
       .filter((m) => m.edgeId === 'edge_A')
       .sort((a, b) => a.positionIndex - b.positionIndex);
 
-    let curUpperXA = upperDepth;
+    let curUpperXA = orientAB === 'edge_A' ? wUpperAB : upperDepth;
     for (const m of upperModulesA) {
       const x = m.offset !== undefined ? m.offset : curUpperXA;
       upperModules2D.push({
@@ -1333,7 +1649,7 @@ export function calculateLayout2D(
       .filter((m) => m.edgeId === 'edge_C')
       .sort((a, b) => a.positionIndex - b.positionIndex);
 
-    let curUpperYC = upperDepth;
+    let curUpperYC = orientAC === 'edge_C' ? wUpperAC : upperDepth;
     for (const m of upperModulesC) {
       const y = m.offset !== undefined ? m.offset : curUpperYC;
       upperModules2D.push({
@@ -1423,6 +1739,10 @@ export function getAvailableEdgeLength(
   const depthA = layout.edgeA.depth || 600;
   const depthB = layout.edgeB?.depth || 600;
   const depthC = layout.edgeC?.depth || 600;
+  const orientAB = layout.cornerOrientationAB || 'edge_A';
+  const orientAC = layout.cornerOrientationAC || 'edge_A';
+  const wBaseAB = layout.cornerWidthBaseAB || 1000;
+  const wBaseAC = layout.cornerWidthBaseAC || 1000;
 
   if (layout.shape === 'I') {
     return layout.edgeA.length;
@@ -1430,23 +1750,29 @@ export function getAvailableEdgeLength(
 
   if (layout.shape === 'L') {
     if (edgeId === 'edge_A') {
-      return Math.max(0, layout.edgeA.length - depthB);
+      const occ = orientAB === 'edge_A' ? wBaseAB : depthB;
+      return Math.max(0, layout.edgeA.length - occ);
     }
     if (edgeId === 'edge_B' && layout.edgeB) {
-      return Math.max(0, layout.edgeB.length - depthA);
+      const occ = orientAB === 'edge_B' ? wBaseAB : depthA;
+      return Math.max(0, layout.edgeB.length - occ);
     }
     return 0;
   }
 
   if (layout.shape === 'U') {
     if (edgeId === 'edge_A') {
-      return Math.max(0, layout.edgeA.length - depthB - depthC);
+      const occAB = orientAB === 'edge_A' ? wBaseAB : depthB;
+      const occAC = orientAC === 'edge_A' ? wBaseAC : depthC;
+      return Math.max(0, layout.edgeA.length - occAB - occAC);
     }
     if (edgeId === 'edge_B' && layout.edgeB) {
-      return Math.max(0, layout.edgeB.length - depthA);
+      const occ = orientAB === 'edge_B' ? wBaseAB : depthA;
+      return Math.max(0, layout.edgeB.length - occ);
     }
     if (edgeId === 'edge_C' && layout.edgeC) {
-      return Math.max(0, layout.edgeC.length - depthA);
+      const occ = orientAC === 'edge_C' ? wBaseAC : depthA;
+      return Math.max(0, layout.edgeC.length - occ);
     }
   }
 

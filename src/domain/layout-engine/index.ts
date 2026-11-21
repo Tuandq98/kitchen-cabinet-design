@@ -410,7 +410,7 @@ export class LayoutEngine {
         input.catalog
       );
 
-      const report = this.ruleEngine.evaluate(testLayout);
+      const report = this.ruleEngine.evaluate(testLayout, input.catalog);
       if (report.hardValid) {
         results.push({
           id: `${strat.id}-${totalFittedWidth}`,
@@ -451,10 +451,8 @@ export class LayoutEngine {
 
     const depthA = edgeA.depth || 600;
     const depthB = edgeB.depth || 600;
-
-    // Chiều dài khả dụng (sau góc)
-    const availA = edgeA.length - depthB; // Cạnh A sau góc
-    const availB = edgeB.length - depthA; // Cạnh B sau góc
+    const cornerWidthBase = 1000;
+    const cornerWidthUpper = 750;
 
     const selectedCodes =
       input.selectedModuleCodes && input.selectedModuleCodes.length > 0
@@ -525,6 +523,48 @@ export class LayoutEngine {
         if (mod) edgeBMods.push({ mod, code: mod.code, name: mod.name, cat: mod.category });
       }
 
+      // ĐÁNH GIÁ ĐỊNH HƯỚNG QUAY LINH HOẠT CỦA KHOANG GÓC NỐI:
+      // Khả năng 1: Góc quay về Cạnh A (A tốn cornerWidthBase, B tốn depthA)
+      const availA_optA = edgeA.length - cornerWidthBase;
+      const availB_optA = edgeB.length - depthA;
+
+      // Khả năng 2: Góc quay về Cạnh B (A tốn depthB, B tốn cornerWidthBase)
+      const availA_optB = edgeA.length - depthB;
+      const availB_optB = edgeB.length - cornerWidthBase;
+
+      // Tính tổng chiều rộng tối thiểu cần thiết cho các khoang công năng cốt lõi (B01, S01, SP01, C01)
+      const calcMinTotal = (list: { mod: KitchenModule }[]) =>
+        list.reduce((sum, item) => {
+          const minW = item.mod.minWidth || Math.min(...item.mod.variants.map((v) => v.width));
+          return sum + minW;
+        }, 0);
+
+      const minA = calcMinTotal(edgeAMods);
+      const minB = calcMinTotal(edgeBMods);
+
+      // Quy tắc định hướng:
+      // 1. Ưu tiên đảm bảo bộ công năng tối thiểu (Bếp từ - Chậu rửa - Gia vị - Dao thớt)
+      const canFitOptA = availA_optA >= minA && availB_optA >= minB;
+      const canFitOptB = availA_optB >= minA && availB_optB >= minB;
+
+      let chosenOrient: 'edge_A' | 'edge_B' = 'edge_A';
+      if (canFitOptA && !canFitOptB) {
+        chosenOrient = 'edge_A';
+      } else if (!canFitOptA && canFitOptB) {
+        chosenOrient = 'edge_B';
+      } else if (canFitOptA && canFitOptB) {
+        // 2. Nếu cả 2 đều đủ chỗ: cạnh nào còn dư diện tích chiều dài lớn hơn thì khoang góc sẽ quay về cạnh đó
+        const remainCapacityA = edgeA.length - minA;
+        const remainCapacityB = edgeB.length - minB;
+        chosenOrient = remainCapacityA >= remainCapacityB ? 'edge_A' : 'edge_B';
+      } else {
+        // Cả 2 đều chật: ưu tiên quay về cạnh dài hơn
+        chosenOrient = edgeA.length >= edgeB.length ? 'edge_A' : 'edge_B';
+      }
+
+      const availA = chosenOrient === 'edge_A' ? availA_optA : availA_optB;
+      const availB = chosenOrient === 'edge_A' ? availB_optA : availB_optB;
+
       // Tự động điều chỉnh kích thước biến thể của các khoang để phù hợp với mét dài từng cạnh
       let fittedA = this.adjustVariantsToFit(edgeAMods, availA);
       let fittedB = this.adjustVariantsToFit(edgeBMods, availB);
@@ -551,7 +591,7 @@ export class LayoutEngine {
 
       if (!fittedA || !fittedB) continue;
 
-      let curOffsetA = depthB;
+      let curOffsetA = chosenOrient === 'edge_A' ? cornerWidthBase : depthB;
       let pIdxA = 0;
       let sumA = 0;
       for (const item of fittedA) {
@@ -574,7 +614,7 @@ export class LayoutEngine {
         sumA += item.variant.width;
       }
 
-      let curOffsetB = depthA;
+      let curOffsetB = chosenOrient === 'edge_B' ? cornerWidthBase : depthA;
       let pIdxB = 0;
       let sumB = 0;
       for (const item of fittedB) {
@@ -604,6 +644,9 @@ export class LayoutEngine {
         edgeA: { length: edgeA.length, depth: edgeA.depth, height: edgeA.height, id: 'edge_A', name: 'Cạnh A' },
         edgeB: { length: edgeB.length, depth: edgeB.depth, height: edgeB.height, id: 'edge_B', name: 'Cạnh B', angle: edgeB.angle || 90 },
         cornerConfig: { size: 600 },
+        cornerOrientationAB: chosenOrient,
+        cornerWidthBaseAB: cornerWidthBase,
+        cornerWidthUpperAB: cornerWidthUpper,
         placedModules: placed,
         upperDepth: 350,
         upperHeight: 750,
@@ -616,7 +659,7 @@ export class LayoutEngine {
         input.catalog
       );
 
-      const report = this.ruleEngine.evaluate(testLayout);
+      const report = this.ruleEngine.evaluate(testLayout, input.catalog);
       if (report.hardValid) {
         results.push({
           id: strat.id,
@@ -656,10 +699,8 @@ export class LayoutEngine {
     const depthA = edgeA.depth || 600;
     const depthB = edgeB.depth || 600;
     const depthC = edgeC.depth || 600;
-
-    const availA = edgeA.length - depthB - depthC;
-    const availB = edgeB.length - depthA;
-    const availC = edgeC.length - depthA;
+    const cornerWidthBase = 1000;
+    const cornerWidthUpper = 750;
 
     const selectedCodes =
       input.selectedModuleCodes && input.selectedModuleCodes.length > 0
@@ -726,6 +767,51 @@ export class LayoutEngine {
         if (mod) edgeCMods.push({ mod, code: mod.code, name: mod.name, cat: mod.category });
       }
 
+      // ĐÁNH GIÁ ĐỊNH HƯỚNG QUAY TỐI ƯU CỦA 2 GÓC NỐI (AB và AC):
+      const calcMinTotal = (list: { mod: KitchenModule }[]) =>
+        list.reduce((sum, item) => {
+          const minW = item.mod.minWidth || Math.min(...item.mod.variants.map((v) => v.width));
+          return sum + minW;
+        }, 0);
+
+      const minB = calcMinTotal(edgeBMods);
+      const minA = calcMinTotal(edgeAMods);
+      const minC = calcMinTotal(edgeCMods);
+
+      // Thử 4 tổ hợp hướng quay cho AB và AC:
+      const combos: { orientAB: 'edge_A' | 'edge_B'; orientAC: 'edge_A' | 'edge_C' }[] = [
+        { orientAB: 'edge_B', orientAC: 'edge_C' }, // Tối đa hóa Cạnh A
+        { orientAB: 'edge_A', orientAC: 'edge_C' },
+        { orientAB: 'edge_B', orientAC: 'edge_A' },
+        { orientAB: 'edge_A', orientAC: 'edge_A' },
+      ];
+
+      let bestCombo = combos[0];
+      for (const c of combos) {
+        const tAB_A = c.orientAB === 'edge_A' ? cornerWidthBase : depthB;
+        const tAC_A = c.orientAC === 'edge_A' ? cornerWidthBase : depthC;
+        const tAB_B = c.orientAB === 'edge_B' ? cornerWidthBase : depthA;
+        const tAC_C = c.orientAC === 'edge_C' ? cornerWidthBase : depthA;
+
+        const aA = edgeA.length - tAB_A - tAC_A;
+        const aB = edgeB.length - tAB_B;
+        const aC = edgeC.length - tAC_C;
+
+        if (aA >= minA && aB >= minB && aC >= minC) {
+          bestCombo = c;
+          break;
+        }
+      }
+
+      const takesAB_on_A = bestCombo.orientAB === 'edge_A' ? cornerWidthBase : depthB;
+      const takesAC_on_A = bestCombo.orientAC === 'edge_A' ? cornerWidthBase : depthC;
+      const takesAB_on_B = bestCombo.orientAB === 'edge_B' ? cornerWidthBase : depthA;
+      const takesAC_on_C = bestCombo.orientAC === 'edge_C' ? cornerWidthBase : depthA;
+
+      const availA = edgeA.length - takesAB_on_A - takesAC_on_A;
+      const availB = edgeB.length - takesAB_on_B;
+      const availC = edgeC.length - takesAC_on_C;
+
       // Tự động điều chỉnh kích thước biến thể để vừa với từng cạnh
       const fittedB = this.adjustVariantsToFit(edgeBMods, availB);
       const fittedA = this.adjustVariantsToFit(edgeAMods, availA);
@@ -733,7 +819,7 @@ export class LayoutEngine {
 
       if (!fittedB || !fittedA || !fittedC) continue;
 
-      let curB = depthA;
+      let curB = takesAB_on_B;
       let pIdxB = 0;
       let sumB = 0;
       for (const item of fittedB) {
@@ -756,7 +842,7 @@ export class LayoutEngine {
         sumB += item.variant.width;
       }
 
-      let curA = depthB;
+      let curA = takesAB_on_A;
       let pIdxA = 0;
       let sumA = 0;
       for (const item of fittedA) {
@@ -779,7 +865,7 @@ export class LayoutEngine {
         sumA += item.variant.width;
       }
 
-      let curC = depthA;
+      let curC = takesAC_on_C;
       let pIdxC = 0;
       let sumC = 0;
       for (const item of fittedC) {
@@ -810,6 +896,12 @@ export class LayoutEngine {
         edgeB: { length: edgeB.length, depth: edgeB.depth, height: edgeB.height, id: 'edge_B', name: 'Cạnh B', angle: edgeB.angle || 90 },
         edgeC: { length: edgeC.length, depth: edgeC.depth, height: edgeC.height, id: 'edge_C', name: 'Cạnh C', angle: edgeC.angle || 90 },
         cornerConfig: { size: 600 },
+        cornerOrientationAB: bestCombo.orientAB,
+        cornerOrientationAC: bestCombo.orientAC,
+        cornerWidthBaseAB: cornerWidthBase,
+        cornerWidthBaseAC: cornerWidthBase,
+        cornerWidthUpperAB: cornerWidthUpper,
+        cornerWidthUpperAC: cornerWidthUpper,
         placedModules: placed,
         upperDepth: 350,
         upperHeight: 750,
@@ -822,7 +914,7 @@ export class LayoutEngine {
         input.catalog
       );
 
-      const report = this.ruleEngine.evaluate(testLayout);
+      const report = this.ruleEngine.evaluate(testLayout, input.catalog);
       if (report.hardValid) {
         results.push({
           id: strat.id,
@@ -944,7 +1036,31 @@ export class LayoutEngine {
           ? layout.edgeB?.length || 2400
           : layout.edgeC?.length || 2400;
 
-      const cornerSize = layout.shape === 'I' ? 0 : 350;
+      const upperDepth = layout.upperDepth || 350;
+      const orientAB = layout.cornerOrientationAB || 'edge_A';
+      const wUpperAB = layout.cornerWidthUpperAB || 750;
+      const orientAC = layout.cornerOrientationAC || 'edge_A';
+      const wUpperAC = layout.cornerWidthUpperAC || 750;
+
+      let startEdgeX = 0;
+      let endEdgeX = edgeLength;
+
+      if (layout.shape === 'L') {
+        if (edgeId === 'edge_A') {
+          startEdgeX = orientAB === 'edge_A' ? wUpperAB : upperDepth;
+        } else if (edgeId === 'edge_B') {
+          startEdgeX = orientAB === 'edge_B' ? wUpperAB : upperDepth;
+        }
+      } else if (layout.shape === 'U') {
+        if (edgeId === 'edge_A') {
+          startEdgeX = orientAB === 'edge_A' ? wUpperAB : upperDepth;
+          endEdgeX = edgeLength - (orientAC === 'edge_A' ? wUpperAC : upperDepth);
+        } else if (edgeId === 'edge_B') {
+          startEdgeX = orientAB === 'edge_B' ? wUpperAB : upperDepth;
+        } else if (edgeId === 'edge_C') {
+          startEdgeX = orientAC === 'edge_C' ? wUpperAC : upperDepth;
+        }
+      }
 
       const cookOnEdge = baseOnEdge.find((m) => m.code === 'B01' || m.category === 'cooking');
       const sinkOnEdge = baseOnEdge.find((m) => m.code === 'S01' || m.category === 'sink');
@@ -960,9 +1076,6 @@ export class LayoutEngine {
         return !!catMod?.metadata?.isTallUnit;
       });
 
-      // Tính các khoảng mở khả dụng (Open Intervals) trên cạnh tường này
-      const startEdgeX = cornerSize;
-      const endEdgeX = layout.shape === 'U' && edgeId === 'edge_A' ? edgeLength - cornerSize : edgeLength;
       let openIntervals: { start: number; end: number }[] = [{ start: startEdgeX, end: endEdgeX }];
 
       for (const tall of tallUnitsOnEdge) {
@@ -1000,7 +1113,7 @@ export class LayoutEngine {
         const hoodOffset = Math.round(cookCenter - hoodW / 2);
         // Đảm bảo nằm trong khoảng mở
         anchors.push({
-          offset: Math.max(cornerSize, hoodOffset),
+          offset: Math.max(startEdgeX, hoodOffset),
           width: hoodW,
           mod: hoodMod,
           code: 'UH01',

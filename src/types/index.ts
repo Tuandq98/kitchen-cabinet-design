@@ -54,6 +54,7 @@ export interface KitchenModule {
     isUpperSpiceRackElectric?: boolean;// Khoang giá gia vị nâng hạ điện (600-900)
     isRangeHood?: boolean;             // Khoang hút mùi (710-910)
     isUpperStorage?: boolean;          // Khoang để đồ tủ trên (tối đa 900)
+    isUpperCorner?: boolean;           // Khoang góc nối tủ trên (730-780)
     requiresPlumbing?: boolean;
     requiresVentilation?: boolean;
     requiresPower?: boolean;
@@ -108,6 +109,12 @@ export interface KitchenLayout {
   cornerConfig: {
     size: number; // Kích thước khoảng góc giao nhau (thường bằng depth của cạnh liền kề, vd 600mm)
   };
+  cornerOrientationAB?: 'edge_A' | 'edge_B'; // Hướng khoang góc nối AB quay về (mặc định quay về cạnh có diện tích lớn hơn)
+  cornerOrientationAC?: 'edge_A' | 'edge_C'; // Hướng khoang góc nối AC quay về cho bếp chữ U
+  cornerWidthBaseAB?: number;  // Chiều dài khoang góc tủ dưới AB (980-1030mm, khuyến nghị 1000mm)
+  cornerWidthBaseAC?: number;  // Chiều dài khoang góc tủ dưới AC (980-1030mm, khuyến nghị 1000mm)
+  cornerWidthUpperAB?: number; // Chiều dài khoang góc tủ trên AB (730-780mm, khuyến nghị 750mm)
+  cornerWidthUpperAC?: number; // Chiều dài khoang góc tủ trên AC (730-780mm, khuyến nghị 750mm)
   selectedModuleCodes?: string[]; // Danh sách mã khoang công năng được chọn đưa vào thiết kế
   designPhase?: 'setup' | 'design_base' | 'design_upper'; // Giai đoạn: Setup (Khởi tạo) | Bước 1 (Tủ dưới) | Bước 2 (Tủ trên)
   createdAt: string;

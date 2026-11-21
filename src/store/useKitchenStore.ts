@@ -39,6 +39,7 @@ interface KitchenStoreState {
 
   // 2. Selection & UI State
   selectedModuleId: string | null;
+  selectedCornerId: string | null;
   highlightedModuleIds: string[];
   activeTab: 'catalog' | 'rules' | 'generator' | 'projects';
   activeCabinetTier: 'all' | 'base' | 'upper';
@@ -65,6 +66,10 @@ interface KitchenStoreState {
   // ACTIONS
   // - Selection & View
   setSelectedModuleId: (id: string | null) => void;
+  setSelectedCornerId: (id: string | null) => void;
+  toggleCornerOrientation: (cornerId: string) => void;
+  setCornerOrientation: (cornerId: string, orientation: 'edge_A' | 'edge_B' | 'edge_C') => void;
+  updateCornerWidth: (cornerId: string, tier: 'base' | 'upper', width: number) => void;
   setHighlightedModuleIds: (ids: string[]) => void;
   setActiveTab: (tab: 'catalog' | 'rules' | 'generator' | 'projects') => void;
   setActiveCabinetTier: (tier: 'all' | 'base' | 'upper') => void;
@@ -150,6 +155,11 @@ function normalizePlacedModules(layout: KitchenLayout): PlacedModuleInstance[] {
   const depthB = layout.edgeB?.depth || 600;
   const depthC = layout.edgeC?.depth || 600;
 
+  const orientAB = layout.cornerOrientationAB || 'edge_A';
+  const orientAC = layout.cornerOrientationAC || 'edge_A';
+  const wBaseAB = layout.cornerWidthBaseAB || 1000;
+  const wBaseAC = layout.cornerWidthBaseAC || 1000;
+
   const edges: Array<'edge_A' | 'edge_B' | 'edge_C'> = ['edge_A', 'edge_B', 'edge_C'];
   const result: PlacedModuleInstance[] = [];
 
@@ -160,12 +170,24 @@ function normalizePlacedModules(layout: KitchenLayout): PlacedModuleInstance[] {
 
     let currentOffset = 0;
     if (layout.shape === 'L') {
-      if (edgeId === 'edge_A') currentOffset = depthB;
-      else if (edgeId === 'edge_B') currentOffset = depthA;
+      if (edgeId === 'edge_A') {
+        // Nếu góc quay về A: tốn wBaseAB (980-1030mm). Nếu quay về B: tốn depthB (600mm)
+        currentOffset = orientAB === 'edge_A' ? wBaseAB : depthB;
+      } else if (edgeId === 'edge_B') {
+        // Nếu góc quay về B: tốn wBaseAB (980-1030mm). Nếu quay về A: tốn depthA (600mm)
+        currentOffset = orientAB === 'edge_B' ? wBaseAB : depthA;
+      }
     } else if (layout.shape === 'U') {
-      if (edgeId === 'edge_A') currentOffset = depthB;
-      else if (edgeId === 'edge_B') currentOffset = depthA;
-      else if (edgeId === 'edge_C') currentOffset = depthA;
+      if (edgeId === 'edge_A') {
+        // Cạnh A ở giữa: bắt đầu sau góc AB
+        currentOffset = orientAB === 'edge_A' ? wBaseAB : depthB;
+      } else if (edgeId === 'edge_B') {
+        // Cạnh B bên trái: bắt đầu sau góc AB
+        currentOffset = orientAB === 'edge_B' ? wBaseAB : depthA;
+      } else if (edgeId === 'edge_C') {
+        // Cạnh C bên phải: bắt đầu sau góc AC
+        currentOffset = orientAC === 'edge_C' ? wBaseAC : depthA;
+      }
     }
 
     modulesOnEdge.forEach((m, idx) => {
@@ -188,6 +210,11 @@ export function normalizePlacedUpperModules(layout: KitchenLayout): PlacedModule
   }
 
   const upperDepth = layout.upperDepth || 350;
+  const orientAB = layout.cornerOrientationAB || 'edge_A';
+  const orientAC = layout.cornerOrientationAC || 'edge_A';
+  const wUpperAB = layout.cornerWidthUpperAB || 750;
+  const wUpperAC = layout.cornerWidthUpperAC || 750;
+
   const edges: Array<'edge_A' | 'edge_B' | 'edge_C'> = ['edge_A', 'edge_B', 'edge_C'];
   const result: PlacedModuleInstance[] = [];
 
@@ -218,23 +245,30 @@ export function normalizePlacedUpperModules(layout: KitchenLayout): PlacedModule
       )
       .sort((a, b) => a.offset - b.offset);
 
-    // Kích thước góc giao nhau cho bếp L và U
-    const cornerSize = layout.shape === 'L' || layout.shape === 'U' ? upperDepth : 0;
-
     // Danh sách các khoảng bị chiếm dụng trên cạnh
     const occupied: { start: number; end: number }[] = [];
 
-    // Chiếm dụng bởi góc
+    // Chiếm dụng bởi góc tủ trên (730-780mm theo cạnh quay về, upperDepth theo cạnh đối diện)
     if (layout.shape === 'L') {
-      if (edgeId === 'edge_A' || edgeId === 'edge_B') {
-        occupied.push({ start: 0, end: cornerSize });
+      if (edgeId === 'edge_A') {
+        const occWidth = orientAB === 'edge_A' ? wUpperAB : upperDepth;
+        occupied.push({ start: 0, end: occWidth });
+      } else if (edgeId === 'edge_B') {
+        const occWidth = orientAB === 'edge_B' ? wUpperAB : upperDepth;
+        occupied.push({ start: 0, end: occWidth });
       }
     } else if (layout.shape === 'U') {
       if (edgeId === 'edge_A') {
-        occupied.push({ start: 0, end: cornerSize });
-        occupied.push({ start: edge.length - cornerSize, end: edge.length });
-      } else {
-        occupied.push({ start: 0, end: cornerSize });
+        const occAB = orientAB === 'edge_A' ? wUpperAB : upperDepth;
+        const occAC = orientAC === 'edge_A' ? wUpperAC : upperDepth;
+        occupied.push({ start: 0, end: occAB });
+        occupied.push({ start: edge.length - occAC, end: edge.length });
+      } else if (edgeId === 'edge_B') {
+        const occAB = orientAB === 'edge_B' ? wUpperAB : upperDepth;
+        occupied.push({ start: 0, end: occAB });
+      } else if (edgeId === 'edge_C') {
+        const occAC = orientAC === 'edge_C' ? wUpperAC : upperDepth;
+        occupied.push({ start: 0, end: occAC });
       }
     }
 
@@ -656,6 +690,7 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
     validationReport: initialReport,
 
     selectedModuleId: null,
+    selectedCornerId: null,
     highlightedModuleIds: [],
     activeTab: 'catalog',
     activeCabinetTier: 'base',
@@ -678,7 +713,77 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
     canRedo: false,
 
     // UI actions
-    setSelectedModuleId: (id) => set({ selectedModuleId: id }),
+    setSelectedModuleId: (id) => set({ selectedModuleId: id, selectedCornerId: null }),
+    setSelectedCornerId: (id) => set({ selectedCornerId: id, selectedModuleId: null }),
+    toggleCornerOrientation: (cornerId) => {
+      const state = get();
+      const layout = state.layout;
+      if (layout.shape === 'I') return;
+
+      const isAC = cornerId.includes('AC');
+      const updatedLayout: KitchenLayout = {
+        ...layout,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (!isAC) {
+        const cur = layout.cornerOrientationAB || 'edge_A';
+        updatedLayout.cornerOrientationAB = cur === 'edge_A' ? 'edge_B' : 'edge_A';
+      } else {
+        const cur = layout.cornerOrientationAC || 'edge_A';
+        updatedLayout.cornerOrientationAC = cur === 'edge_A' ? 'edge_C' : 'edge_A';
+      }
+
+      set(pushHistory(state, updatedLayout));
+    },
+    setCornerOrientation: (cornerId, orientation) => {
+      const state = get();
+      const layout = state.layout;
+      if (layout.shape === 'I') return;
+
+      const isAC = cornerId.includes('AC');
+      const updatedLayout: KitchenLayout = {
+        ...layout,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (!isAC) {
+        updatedLayout.cornerOrientationAB = orientation as 'edge_A' | 'edge_B';
+      } else {
+        updatedLayout.cornerOrientationAC = orientation as 'edge_A' | 'edge_C';
+      }
+
+      set(pushHistory(state, updatedLayout));
+    },
+    updateCornerWidth: (cornerId, tier, width) => {
+      const state = get();
+      const layout = state.layout;
+      if (layout.shape === 'I') return;
+
+      const isAC = cornerId.includes('AC');
+      const updatedLayout: KitchenLayout = {
+        ...layout,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (tier === 'base') {
+        const validW = Math.max(980, Math.min(1030, Math.round(width)));
+        if (!isAC) {
+          updatedLayout.cornerWidthBaseAB = validW;
+        } else {
+          updatedLayout.cornerWidthBaseAC = validW;
+        }
+      } else {
+        const validW = Math.max(730, Math.min(780, Math.round(width)));
+        if (!isAC) {
+          updatedLayout.cornerWidthUpperAB = validW;
+        } else {
+          updatedLayout.cornerWidthUpperAC = validW;
+        }
+      }
+
+      set(pushHistory(state, updatedLayout));
+    },
     setHighlightedModuleIds: (ids) => set({ highlightedModuleIds: ids }),
     setActiveTab: (tab) => set({ activeTab: tab }),
     setActiveCabinetTier: (tier) => set({ activeCabinetTier: tier }),
@@ -749,8 +854,9 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
       });
 
       let placedModules: PlacedModuleInstance[] = [];
-      if (genResult.candidates && genResult.candidates.length > 0) {
-        placedModules = genResult.candidates[0].layout.placedModules;
+      const initialCandidateLayout = genResult.candidates && genResult.candidates.length > 0 ? genResult.candidates[0].layout : null;
+      if (initialCandidateLayout) {
+        placedModules = initialCandidateLayout.placedModules;
       } else {
         // Fallback: Sắp xếp tuần tự các khoang đã chọn theo chuẩn công thái học để luôn tạo được bếp
         // Tủ lạnh (F01) ở ngoài cùng mép trái, khoang bàn bếp ở giữa, khối tủ cao P01 + A01 ở ngoài cùng mép phải
@@ -811,6 +917,12 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
         upperDepth: 350,
         upperHeight: 750,
         cornerConfig: { size: 600 },
+        cornerOrientationAB: initialCandidateLayout?.cornerOrientationAB || (newEdgeA.length >= (newEdgeB?.length || 0) ? 'edge_A' : 'edge_B'),
+        cornerOrientationAC: initialCandidateLayout?.cornerOrientationAC || 'edge_C',
+        cornerWidthBaseAB: initialCandidateLayout?.cornerWidthBaseAB || 1000,
+        cornerWidthBaseAC: initialCandidateLayout?.cornerWidthBaseAC || 1000,
+        cornerWidthUpperAB: initialCandidateLayout?.cornerWidthUpperAB || 750,
+        cornerWidthUpperAC: initialCandidateLayout?.cornerWidthUpperAC || 750,
         selectedModuleCodes: baseModuleCodes,
         designPhase: 'design_base',
         createdAt: new Date().toISOString(),
@@ -935,15 +1047,18 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
       // 2. Nếu đã có bản vẽ lưu của newShape, khôi phục lại nguyên vẹn bản vẽ đó
       if (updatedShapeLayouts[newShape]) {
         let targetLayout = updatedShapeLayouts[newShape]!;
-        // Khoang góc nối chỉ được sinh ra khi làm bếp chữ L và chữ U. Bếp chữ I loại bỏ K01.
+        // Khoang góc nối chỉ được sinh ra khi làm bếp chữ L và chữ U. Bếp chữ I loại bỏ K01 và UK01.
         if (newShape === 'I') {
           targetLayout = {
             ...targetLayout,
             placedModules: targetLayout.placedModules.filter(
-              (m) => m.code !== 'K01' && m.category !== 'corner'
+              (m) => m.code !== 'K01' && m.code !== 'UK01' && m.category !== 'corner'
+            ),
+            placedUpperModules: (targetLayout.placedUpperModules || []).filter(
+              (m) => m.code !== 'K01' && m.code !== 'UK01' && m.category !== 'corner'
             ),
             selectedModuleCodes: (targetLayout.selectedModuleCodes || []).filter(
-              (c) => c !== 'K01'
+              (c) => c !== 'K01' && c !== 'UK01'
             ),
           };
         }
@@ -996,8 +1111,9 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
       });
 
       let placedModules: PlacedModuleInstance[] = [];
-      if (genResult.candidates && genResult.candidates.length > 0) {
-        placedModules = genResult.candidates[0].layout.placedModules;
+      const initialCandidateLayout = genResult.candidates && genResult.candidates.length > 0 ? genResult.candidates[0].layout : null;
+      if (initialCandidateLayout) {
+        placedModules = initialCandidateLayout.placedModules;
       } else {
         // Fallback: Sắp xếp tuần tự các khoang đã chọn theo chuẩn công thái học để luôn tạo được bếp
         // Tủ lạnh (F01) ở ngoài cùng mép trái, khoang bàn bếp ở giữa, khối tủ cao P01 + A01 ở ngoài cùng mép phải
@@ -1058,6 +1174,12 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
         upperDepth: 350,
         upperHeight: 750,
         cornerConfig: { size: 600 },
+        cornerOrientationAB: initialCandidateLayout?.cornerOrientationAB || (edgeA.length >= (edgeB?.length || 0) ? 'edge_A' : 'edge_B'),
+        cornerOrientationAC: initialCandidateLayout?.cornerOrientationAC || 'edge_C',
+        cornerWidthBaseAB: initialCandidateLayout?.cornerWidthBaseAB || 1000,
+        cornerWidthBaseAC: initialCandidateLayout?.cornerWidthBaseAC || 1000,
+        cornerWidthUpperAB: initialCandidateLayout?.cornerWidthUpperAB || 750,
+        cornerWidthUpperAC: initialCandidateLayout?.cornerWidthUpperAC || 750,
         selectedModuleCodes: baseCodes,
         designPhase: 'design_base',
         createdAt: new Date().toISOString(),
@@ -1101,7 +1223,7 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
       // Khoang góc nối chỉ được sinh ra khi làm bếp chữ L và chữ U
       if (
         state.layout.shape === 'I' &&
-        (mod.category === 'corner' || mod.code === 'K01' || mod.metadata?.isCorner)
+        (mod.category === 'corner' || mod.code === 'K01' || mod.code === 'UK01' || mod.metadata?.isCorner)
       ) {
         alert('Khoang góc nối chỉ được sử dụng khi thiết kế bếp chữ L hoặc chữ U!');
         return;
@@ -1529,7 +1651,7 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
     updatePlacedModuleCustomWidth: (instanceId, customWidth) => {
       const state = get();
 
-      // 1. Khoang tủ dưới (S01: chậu rửa linh hoạt 830-900mm, T01: tủ chứa đồ linh hoạt >= 300mm)
+      // 1. Khoang tủ dưới (S01: chậu rửa linh hoạt 830-900mm, K01: khoang góc 980-1030mm, T01: tủ chứa đồ linh hoạt >= 300mm)
       const targetBase = state.layout.placedModules.find(
         (m) => m.instanceId === instanceId
       );
@@ -1537,6 +1659,8 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
         let validWidth = Math.round(customWidth);
         if (targetBase.code === 'S01') {
           validWidth = Math.max(830, Math.min(900, validWidth));
+        } else if (targetBase.code === 'K01') {
+          validWidth = Math.max(980, Math.min(1030, validWidth));
         } else if (targetBase.code === 'T01') {
           const spaceInfo = getBaseModuleSpaceInfo(instanceId, state.layout);
           validWidth = Math.max(300, Math.min(spaceInfo.maxAllowedWidth, validWidth));
@@ -1563,18 +1687,24 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
         return;
       }
 
-      // 2. Khoang tủ chứa đồ tủ trên (UT01) tùy chỉnh kích cỡ linh động
+      // 2. Khoang tủ trên (UK01: khoang góc 730-780mm, UT01: khoang để đồ)
       const targetUpper = (state.layout.placedUpperModules || []).find(
         (m) => m.instanceId === instanceId
       );
-      if (!targetUpper || targetUpper.code !== 'UT01') return;
+      if (!targetUpper) return;
 
-      // CHỐNG ĐÈ: Giới hạn kích thước không được vượt quá maxAllowedWidth
-      const spaceInfo = getUpperModuleSpaceInfo(instanceId, state.layout);
-      const validWidth = Math.max(
-        300,
-        Math.min(spaceInfo.maxAllowedWidth, Math.round(customWidth))
-      );
+      let validWidth = Math.round(customWidth);
+      if (targetUpper.code === 'UK01') {
+        validWidth = Math.max(730, Math.min(780, validWidth));
+      } else if (targetUpper.code === 'UT01') {
+        const spaceInfo = getUpperModuleSpaceInfo(instanceId, state.layout);
+        validWidth = Math.max(
+          300,
+          Math.min(spaceInfo.maxAllowedWidth, validWidth)
+        );
+      } else {
+        return;
+      }
 
       const updatedModules = (state.layout.placedUpperModules || []).map((m) => {
         if (m.instanceId === instanceId) {
@@ -1792,7 +1922,7 @@ export const useKitchenStore = create<KitchenStoreState>((set, get) => {
       }
 
       if (state.layout.shape === 'I') {
-        baseCodes = baseCodes.filter((c) => c !== 'K01');
+        baseCodes = baseCodes.filter((c) => c !== 'K01' && c !== 'UK01');
       }
 
       set({ selectedModuleCodes: baseCodes });

@@ -27,6 +27,7 @@ export const KitchenCanvas2D: React.FC = () => {
     layout,
     catalog,
     selectedModuleId,
+    selectedCornerId,
     highlightedModuleIds,
     zoom,
     pan,
@@ -41,6 +42,8 @@ export const KitchenCanvas2D: React.FC = () => {
     regenerateUpperCabinets,
     resetToSetupWizard,
     setSelectedModuleId,
+    setSelectedCornerId,
+    toggleCornerOrientation,
     setZoom,
     setPan,
     resetView,
@@ -726,87 +729,259 @@ export const KitchenCanvas2D: React.FC = () => {
 
           {/* 2. CÁC GÓC NỐI (CORNER JOINTS) TỦ DƯỚI */}
           {(activeCabinetTier === 'all' || activeCabinetTier === 'base') &&
-            layout2D.corners.map((corner) => (
-              <g key={corner.id} className="corner-joint">
-                <rect
-                  x={corner.x}
-                  y={corner.y}
-                  width={corner.width}
-                  height={corner.height}
-                  fill="#1e293b"
-                  stroke="#475569"
-                  strokeWidth="1.5"
-                />
-                {/* Vạch chéo góc chết kiến trúc */}
-                <line
-                  x1={corner.x}
-                  y1={corner.y}
-                  x2={corner.x + corner.width}
-                  y2={corner.y + corner.height}
-                  stroke="#64748b"
-                  strokeWidth="1"
-                  strokeDasharray="4 3"
-                />
-                <line
-                  x1={corner.x + corner.width}
-                  y1={corner.y}
-                  x2={corner.x}
-                  y2={corner.y + corner.height}
-                  stroke="#64748b"
-                  strokeWidth="1"
-                  strokeDasharray="4 3"
-                />
-                <rect
-                  x={corner.x + corner.width / 2 - 110}
-                  y={corner.y + corner.height / 2 - 32}
-                  width="220"
-                  height="64"
-                  rx="12"
-                  fill="#090d16"
-                  stroke="#64748b"
-                  strokeWidth="2.5"
-                />
-                <text
-                  x={corner.x + corner.width / 2}
-                  y={corner.y + corner.height / 2 + 12}
-                  textAnchor="middle"
-                  fill="#f1f5f9"
-                  fontSize="40"
-                  fontWeight="900"
-                  letterSpacing="1px"
+            layout2D.corners.map((corner) => {
+              const isSelected = selectedCornerId === corner.id;
+              const deadW = corner.deadWidth || 600;
+              const deadH = corner.deadHeight || 600;
+
+              return (
+                <g
+                  key={corner.id}
+                  className="corner-joint cursor-pointer group"
+                  onClick={() => setSelectedCornerId(corner.id)}
                 >
-                  GÓC NỐI
-                </text>
-              </g>
-            ))}
+                  {/* Thùng bao khoang góc tổng thể */}
+                  <rect
+                    x={corner.x}
+                    y={corner.y}
+                    width={corner.width}
+                    height={corner.height}
+                    fill="#1e293b"
+                    stroke={isSelected ? '#38bdf8' : '#475569'}
+                    strokeWidth={isSelected ? '3' : '1.5'}
+                    rx="2"
+                  />
+
+                  {/* Vùng góc chết giao nhau */}
+                  <rect
+                    x={corner.x}
+                    y={corner.y}
+                    width={deadW}
+                    height={deadH}
+                    fill="#0f172a"
+                    stroke="#334155"
+                    strokeWidth="1"
+                    strokeDasharray="4 2"
+                  />
+                  {/* Vạch chéo góc chết kiến trúc */}
+                  <line
+                    x1={corner.x}
+                    y1={corner.y}
+                    x2={corner.x + deadW}
+                    y2={corner.y + deadH}
+                    stroke="#64748b"
+                    strokeWidth="1"
+                    strokeDasharray="4 3"
+                  />
+                  <line
+                    x1={corner.x + deadW}
+                    y1={corner.y}
+                    x2={corner.x}
+                    y2={corner.y + deadH}
+                    stroke="#64748b"
+                    strokeWidth="1"
+                    strokeDasharray="4 3"
+                  />
+
+                  {/* Khối nhãn thông tin trung tâm */}
+                  <rect
+                    x={corner.x + corner.width / 2 - 130}
+                    y={corner.y + corner.height / 2 - 50}
+                    width="260"
+                    height="70"
+                    rx="12"
+                    fill="#090d16"
+                    stroke={isSelected ? '#38bdf8' : '#64748b'}
+                    strokeWidth="2"
+                  />
+                  <text
+                    x={corner.x + corner.width / 2}
+                    y={corner.y + corner.height / 2 - 25}
+                    textAnchor="middle"
+                    fill="#f1f5f9"
+                    fontSize="22"
+                    fontWeight="900"
+                    letterSpacing="0.5px"
+                  >
+                    GÓC NỐI TỦ DƯỚI
+                  </text>
+                  <text
+                    x={corner.x + corner.width / 2}
+                    y={corner.y + corner.height / 2 - 4}
+                    textAnchor="middle"
+                    fill="#38bdf8"
+                    fontSize="18"
+                    fontWeight="700"
+                  >
+                    {corner.width} × {corner.height} mm
+                  </text>
+                  <text
+                    x={corner.x + corner.width / 2}
+                    y={corner.y + corner.height / 2 + 14}
+                    textAnchor="middle"
+                    fill="#94a3b8"
+                    fontSize="13"
+                    fontWeight="600"
+                  >
+                    {corner.orientation === 'edge_B'
+                      ? 'Dài quay Cạnh B'
+                      : corner.orientation === 'edge_C'
+                      ? 'Dài quay Cạnh C'
+                      : 'Dài quay Cạnh A'}
+                  </text>
+
+                  {/* Nút bấm đảo hướng quay nhanh */}
+                  <g
+                    className="hover:opacity-100 opacity-80 transition cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleCornerOrientation(corner.id);
+                    }}
+                  >
+                    <rect
+                      x={corner.x + corner.width / 2 - 80}
+                      y={corner.y + corner.height / 2 + 28}
+                      width="160"
+                      height="28"
+                      rx="6"
+                      fill="#0284c7"
+                      stroke="#38bdf8"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x={corner.x + corner.width / 2}
+                      y={corner.y + corner.height / 2 + 47}
+                      textAnchor="middle"
+                      fill="#ffffff"
+                      fontSize="14"
+                      fontWeight="bold"
+                    >
+                      ⇄ Đổi hướng quay
+                    </text>
+                  </g>
+                </g>
+              );
+            })}
 
           {/* 3. CÁC GÓC NỐI (CORNER JOINTS) TỦ TRÊN */}
           {(activeCabinetTier === 'all' || activeCabinetTier === 'upper') &&
-            layout2D.upperCorners.map((corner) => (
-              <g key={corner.id} className="upper-corner-joint">
-                <rect
-                  x={corner.x}
-                  y={corner.y}
-                  width={corner.width}
-                  height={corner.height}
-                  fill="#0c4a6e"
-                  fillOpacity="0.85"
-                  stroke="#38bdf8"
-                  strokeWidth="2"
-                  strokeDasharray="4 2"
-                />
-                <text
-                  x={corner.x + corner.width / 2}
-                  y={corner.y + corner.height / 2 + 6}
-                  textAnchor="middle"
-                  fill="#bae6fd"
-                  fontSize="24"
-                  fontWeight="900"
+            layout2D.upperCorners.map((corner) => {
+              const isSelected = selectedCornerId === corner.id;
+              const deadW = corner.deadWidth || 350;
+              const deadH = corner.deadHeight || 350;
+
+              return (
+                <g
+                  key={corner.id}
+                  className="upper-corner-joint cursor-pointer group"
+                  onClick={() => setSelectedCornerId(corner.id)}
                 >
-                  GÓC TỦ TRÊN
-                </text>
-              </g>
-            ))}
+                  <rect
+                    x={corner.x}
+                    y={corner.y}
+                    width={corner.width}
+                    height={corner.height}
+                    fill="#0c4a6e"
+                    fillOpacity="0.85"
+                    stroke={isSelected ? '#38bdf8' : '#0284c7'}
+                    strokeWidth={isSelected ? '3' : '2'}
+                    strokeDasharray="4 2"
+                    rx="2"
+                  />
+                  {/* Vùng góc chết giao nhau tủ trên */}
+                  <rect
+                    x={corner.x}
+                    y={corner.y}
+                    width={deadW}
+                    height={deadH}
+                    fill="#082f49"
+                    stroke="#0284c7"
+                    strokeWidth="1"
+                    strokeDasharray="2 2"
+                  />
+                  <line
+                    x1={corner.x}
+                    y1={corner.y}
+                    x2={corner.x + deadW}
+                    y2={corner.y + deadH}
+                    stroke="#0ea5e9"
+                    strokeWidth="1"
+                    strokeDasharray="3 2"
+                  />
+                  <line
+                    x1={corner.x + deadW}
+                    y1={corner.y}
+                    x2={corner.x}
+                    y2={corner.y + deadH}
+                    stroke="#0ea5e9"
+                    strokeWidth="1"
+                    strokeDasharray="3 2"
+                  />
+
+                  {/* Nhãn thông tin góc tủ trên */}
+                  <rect
+                    x={corner.x + corner.width / 2 - 100}
+                    y={corner.y + corner.height / 2 - 35}
+                    width="200"
+                    height="54"
+                    rx="8"
+                    fill="#082f49"
+                    stroke={isSelected ? '#38bdf8' : '#0ea5e9'}
+                    strokeWidth="1.5"
+                  />
+                  <text
+                    x={corner.x + corner.width / 2}
+                    y={corner.y + corner.height / 2 - 15}
+                    textAnchor="middle"
+                    fill="#bae6fd"
+                    fontSize="18"
+                    fontWeight="900"
+                  >
+                    GÓC TỦ TRÊN
+                  </text>
+                  <text
+                    x={corner.x + corner.width / 2}
+                    y={corner.y + corner.height / 2 + 5}
+                    textAnchor="middle"
+                    fill="#7dd3fc"
+                    fontSize="14"
+                    fontWeight="700"
+                  >
+                    {corner.width} × {corner.height} mm
+                  </text>
+
+                  {/* Nút bấm đảo hướng quay nhanh tủ trên */}
+                  <g
+                    className="hover:opacity-100 opacity-80 transition cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleCornerOrientation(corner.id);
+                    }}
+                  >
+                    <rect
+                      x={corner.x + corner.width / 2 - 65}
+                      y={corner.y + corner.height / 2 + 25}
+                      width="130"
+                      height="24"
+                      rx="5"
+                      fill="#0369a1"
+                      stroke="#38bdf8"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x={corner.x + corner.width / 2}
+                      y={corner.y + corner.height / 2 + 42}
+                      textAnchor="middle"
+                      fill="#ffffff"
+                      fontSize="12"
+                      fontWeight="bold"
+                    >
+                      ⇄ Đổi hướng quay
+                    </text>
+                  </g>
+                </g>
+              );
+            })}
 
           {/* 4. CÁC KHOANG CÔNG NĂNG TỦ DƯỚI (BASE MODULES) */}
           {(activeCabinetTier === 'all' || activeCabinetTier === 'base') &&

@@ -159,11 +159,14 @@ export const DEFAULT_MODULES: KitchenModule[] = [
     code: 'K01',
     name: 'Khoang góc liên hoàn',
     category: 'corner',
-    description: 'Khoang góc chữ L/U tích hợp mâm xoay góc hoặc góc chết tối ưu',
+    description: 'Khoang góc chữ L/U tích hợp mâm xoay góc hoặc góc chết tối ưu (980-1030mm)',
     color: '#64748b', // Slate-500
+    minWidth: 980,
+    maxWidth: 1030,
     variants: [
-      { id: 'var-k01-900', width: 900, depth: 900, height: 850, isDefault: true },
-      { id: 'var-k01-600', width: 600, depth: 600, height: 850 },
+      { id: 'var-k01-1000', width: 1000, depth: 600, height: 850, isDefault: true },
+      { id: 'var-k01-980', width: 980, depth: 600, height: 850 },
+      { id: 'var-k01-1030', width: 1030, depth: 600, height: 850 },
     ],
     metadata: {
       isCorner: true,
@@ -379,6 +382,27 @@ export const DEFAULT_MODULES: KitchenModule[] = [
       doorSwing: 'left',
     },
   },
+  {
+    id: 'mod-upper-corner-01',
+    code: 'UK01',
+    name: 'Khoang góc nối tủ trên',
+    category: 'corner',
+    tier: 'upper',
+    description: 'Khoang góc chữ L/U tủ trên kết nối 2 cạnh vuông góc, tối ưu không gian lưu trữ góc (730-780mm)',
+    color: '#475569', // Slate-600
+    minWidth: 730,
+    maxWidth: 780,
+    variants: [
+      { id: 'var-uk01-750', width: 750, depth: 350, height: 750, isDefault: true },
+      { id: 'var-uk01-730', width: 730, depth: 350, height: 750 },
+      { id: 'var-uk01-780', width: 780, depth: 350, height: 750 },
+    ],
+    metadata: {
+      isCorner: true,
+      isUpperCorner: true,
+      doorSwing: 'left',
+    },
+  },
 ];
 
 export const DEFAULT_RULES: DesignRule[] = [
@@ -461,7 +485,7 @@ export const DEFAULT_RULES: DesignRule[] = [
     id: 'rule-corner-shape-validation',
     code: 'RULE_10',
     name: 'Khoang góc nối chỉ được sinh ra khi làm bếp chữ L và chữ U',
-    description: 'Khoang góc nối (Khoang góc liên hoàn K01 hoặc các khoang thuộc nhóm góc) chỉ được phép sử dụng trong bố cục bếp chữ L hoặc chữ U để liên kết 2 cạnh tường vuông góc. Bếp thẳng chữ I không có góc giao nên tuyệt đối không được bố trí khoang góc nối.',
+    description: 'Khoang góc nối (Khoang góc liên hoàn tủ dưới K01 hoặc Khoang góc nối tủ trên UK01) chỉ được phép sử dụng trong bố cục bếp chữ L hoặc chữ U để liên kết 2 cạnh tường vuông góc. Bếp thẳng chữ I không có góc giao nên tuyệt đối không được bố trí khoang góc nối.',
     type: 'CORNER_SHAPE_VALIDATION',
     severity: 'ERROR', // Hard constraint
     enabled: true,
@@ -656,6 +680,9 @@ export const INITIAL_LAYOUT: KitchenLayout = {
   cornerConfig: {
     size: 600,
   },
+  cornerOrientationAB: 'edge_A',
+  cornerWidthBaseAB: 1000,
+  cornerWidthUpperAB: 750,
   selectedModuleCodes: ['F01', 'S01', 'B01', 'D01', 'C01', 'SP01'],
   designPhase: 'setup',
   createdAt: new Date().toISOString(),

@@ -31,8 +31,13 @@ export const RightSidebar: React.FC = () => {
     layout,
     catalog,
     selectedModuleId,
+    selectedCornerId,
     validationReport,
     setSelectedModuleId,
+    setSelectedCornerId,
+    toggleCornerOrientation,
+    setCornerOrientation,
+    updateCornerWidth,
     setHighlightedModuleIds,
     removePlacedModule,
     updatePlacedModuleVariant,
@@ -104,9 +109,183 @@ export const RightSidebar: React.FC = () => {
               Bỏ chọn
             </button>
           )}
+          {selectedCornerId && (
+            <button
+              onClick={() => setSelectedCornerId(null)}
+              className="text-[11px] text-slate-500 hover:text-slate-300"
+            >
+              Bỏ chọn góc
+            </button>
+          )}
         </div>
 
-        {selectedModule ? (
+        {selectedCornerId ? (
+          <div className="space-y-3 bg-slate-900/90 p-3 rounded-xl border border-sky-500/40 shadow-lg">
+            {/* Header góc nối */}
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                    {selectedCornerId.includes('AC') ? 'GÓC AC' : 'GÓC AB'}
+                  </span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    BẾP CHỮ {layout.shape}
+                  </span>
+                  <h4 className="text-sm font-bold text-slate-100">
+                    Khoang góc nối liên hoàn
+                  </h4>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Định hướng: {
+                    (selectedCornerId.includes('AC') ? layout.cornerOrientationAC : layout.cornerOrientationAB) === 'edge_B'
+                      ? 'Dài quay Cạnh B'
+                      : (selectedCornerId.includes('AC') ? layout.cornerOrientationAC : layout.cornerOrientationAB) === 'edge_C'
+                      ? 'Dài quay Cạnh C'
+                      : 'Dài quay Cạnh A'
+                  }
+                </p>
+              </div>
+
+              <button
+                onClick={() => setSelectedCornerId(null)}
+                className="text-[11px] text-slate-500 hover:text-slate-300"
+              >
+                Đóng
+              </button>
+            </div>
+
+            {/* Chiều sâu theo tủ */}
+            <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950 p-2 rounded-lg border border-slate-800">
+              <div>
+                <span className="text-slate-500 block text-[10px]">Sâu tủ dưới:</span>
+                <span className="font-mono font-bold text-slate-200">
+                  {layout.edgeA.depth || 600}mm
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-[10px]">Sâu tủ trên:</span>
+                <span className="font-mono font-bold text-slate-200">
+                  {layout.upperDepth || 350}mm
+                </span>
+              </div>
+            </div>
+
+            {/* 1. Tùy chỉnh chiều dài góc tủ dưới (980mm - 1030mm) */}
+            <div className="space-y-1.5 pt-2 border-t border-slate-800">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-slate-300">
+                  Dài khoang góc tủ dưới:
+                </label>
+                <span className="text-[11px] font-mono font-bold text-sky-400">
+                  {selectedCornerId.includes('AC') ? (layout.cornerWidthBaseAC || 1000) : (layout.cornerWidthBaseAB || 1000)}mm
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {[980, 1000, 1030].map((w) => {
+                  const curW = selectedCornerId.includes('AC') ? (layout.cornerWidthBaseAC || 1000) : (layout.cornerWidthBaseAB || 1000);
+                  return (
+                    <button
+                      key={w}
+                      onClick={() => updateCornerWidth(selectedCornerId, 'base', w)}
+                      className={`flex-1 py-1 text-[11px] font-mono rounded font-medium border ${
+                        curW === w
+                          ? 'bg-sky-500 text-white border-sky-400 font-bold'
+                          : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      {w}mm {w === 1000 ? '(Chuẩn)' : ''}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="range"
+                min={980}
+                max={1030}
+                step={5}
+                value={selectedCornerId.includes('AC') ? (layout.cornerWidthBaseAC || 1000) : (layout.cornerWidthBaseAB || 1000)}
+                onChange={(e) => updateCornerWidth(selectedCornerId, 'base', Number(e.target.value))}
+                className="w-full accent-sky-500 bg-slate-950 h-1 rounded"
+              />
+            </div>
+
+            {/* 2. Tùy chỉnh chiều dài góc tủ trên (730mm - 780mm) */}
+            <div className="space-y-1.5 pt-2 border-t border-slate-800">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-slate-300">
+                  Dài khoang góc tủ trên:
+                </label>
+                <span className="text-[11px] font-mono font-bold text-amber-400">
+                  {selectedCornerId.includes('AC') ? (layout.cornerWidthUpperAC || 750) : (layout.cornerWidthUpperAB || 750)}mm
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {[730, 750, 780].map((w) => {
+                  const curW = selectedCornerId.includes('AC') ? (layout.cornerWidthUpperAC || 750) : (layout.cornerWidthUpperAB || 750);
+                  return (
+                    <button
+                      key={w}
+                      onClick={() => updateCornerWidth(selectedCornerId, 'upper', w)}
+                      className={`flex-1 py-1 text-[11px] font-mono rounded font-medium border ${
+                        curW === w
+                          ? 'bg-amber-500 text-white border-amber-400 font-bold'
+                          : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      {w}mm {w === 750 ? '(Chuẩn)' : ''}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="range"
+                min={730}
+                max={780}
+                step={5}
+                value={selectedCornerId.includes('AC') ? (layout.cornerWidthUpperAC || 750) : (layout.cornerWidthUpperAB || 750)}
+                onChange={(e) => updateCornerWidth(selectedCornerId, 'upper', Number(e.target.value))}
+                className="w-full accent-amber-500 bg-slate-950 h-1 rounded"
+              />
+            </div>
+
+            {/* 3. Nút chuyển đổi định hướng quay */}
+            <div className="pt-2 border-t border-slate-800 space-y-2">
+              <label className="text-[11px] font-semibold text-slate-300 block">
+                Định hướng quay khoang góc:
+              </label>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  onClick={() => setCornerOrientation(selectedCornerId, 'edge_A')}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition ${
+                    (selectedCornerId.includes('AC') ? layout.cornerOrientationAC : layout.cornerOrientationAB) === 'edge_A'
+                      ? 'bg-sky-500 text-white border-sky-400 shadow'
+                      : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  Quay về Cạnh A
+                </button>
+                <button
+                  onClick={() =>
+                    setCornerOrientation(
+                      selectedCornerId,
+                      selectedCornerId.includes('AC') ? 'edge_C' : 'edge_B'
+                    )
+                  }
+                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition ${
+                    (selectedCornerId.includes('AC') ? layout.cornerOrientationAC : layout.cornerOrientationAB) !== 'edge_A'
+                      ? 'bg-sky-500 text-white border-sky-400 shadow'
+                      : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  Quay về {selectedCornerId.includes('AC') ? 'Cạnh C' : 'Cạnh B'}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-relaxed bg-slate-950 p-2 rounded border border-slate-800/80">
+                💡 <span className="text-sky-300 font-semibold">Quy tắc thông minh:</span> Khoang góc quay dài về cạnh nào sẽ chiếm 980-1030mm ở cạnh đó. Cạnh đối diện chỉ tốn bằng độ sâu tủ (600mm), giúp tối đa hóa diện tích cho 4 công năng cốt lõi: Bếp - Chậu - Gia vị - Dao thớt.
+              </p>
+            </div>
+          </div>
+        ) : selectedModule ? (
           <div className="space-y-3 bg-slate-900/90 p-3 rounded-xl border border-slate-800">
             {/* Header khoang */}
             <div className="flex items-start justify-between">
@@ -343,6 +522,184 @@ export const RightSidebar: React.FC = () => {
                       updatePlacedModuleCustomWidth(
                         selectedModule.instanceId,
                         Math.min(900, selectedModule.width + 10)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Tăng 10mm"
+                  >
+                    +10
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Khoang góc nối tủ dưới (K01): Tùy chỉnh linh hoạt từ 980mm đến 1030mm (Khuyến nghị 1000mm) */}
+            {selectedModule.code === 'K01' && (
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Chiều dài khoang góc tủ dưới:</span>
+                  </label>
+                  <span className="text-[10px] text-sky-400 font-mono font-bold">
+                    980mm - 1030mm (Chuẩn 1000mm)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={selectedModule.width <= 980}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.max(980, selectedModule.width - 10)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Giảm 10mm"
+                  >
+                    -10
+                  </button>
+                  <button
+                    disabled={selectedModule.width <= 980}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.max(980, selectedModule.width - 5)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Giảm 5mm"
+                  >
+                    -5
+                  </button>
+                  <div className="relative flex-1">
+                    <input
+                      type="number"
+                      min={980}
+                      max={1030}
+                      step={5}
+                      value={selectedModule.width}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (!isNaN(val) && val >= 980 && val <= 1030) {
+                          updatePlacedModuleCustomWidth(selectedModule.instanceId, val);
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono font-bold text-sky-400 focus:outline-none focus:border-sky-500"
+                    />
+                    <span className="absolute right-2 top-1.5 text-[10px] text-slate-500 pointer-events-none">
+                      mm
+                    </span>
+                  </div>
+                  <button
+                    disabled={selectedModule.width >= 1030}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.min(1030, selectedModule.width + 5)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Tăng 5mm"
+                  >
+                    +5
+                  </button>
+                  <button
+                    disabled={selectedModule.width >= 1030}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.min(1030, selectedModule.width + 10)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Tăng 10mm"
+                  >
+                    +10
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Khoang góc nối tủ trên (UK01): Tùy chỉnh linh hoạt từ 730mm đến 780mm (Khuyến nghị 750mm) */}
+            {selectedModule.code === 'UK01' && (
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Chiều dài khoang góc tủ trên:</span>
+                  </label>
+                  <span className="text-[10px] text-amber-400 font-mono font-bold">
+                    730mm - 780mm (Chuẩn 750mm)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={selectedModule.width <= 730}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.max(730, selectedModule.width - 10)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Giảm 10mm"
+                  >
+                    -10
+                  </button>
+                  <button
+                    disabled={selectedModule.width <= 730}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.max(730, selectedModule.width - 5)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Giảm 5mm"
+                  >
+                    -5
+                  </button>
+                  <div className="relative flex-1">
+                    <input
+                      type="number"
+                      min={730}
+                      max={780}
+                      step={5}
+                      value={selectedModule.width}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (!isNaN(val) && val >= 730 && val <= 780) {
+                          updatePlacedModuleCustomWidth(selectedModule.instanceId, val);
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-xs font-mono font-bold text-amber-400 focus:outline-none focus:border-amber-500"
+                    />
+                    <span className="absolute right-2 top-1.5 text-[10px] text-slate-500 pointer-events-none">
+                      mm
+                    </span>
+                  </div>
+                  <button
+                    disabled={selectedModule.width >= 780}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.min(780, selectedModule.width + 5)
+                      )
+                    }
+                    className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Tăng 5mm"
+                  >
+                    +5
+                  </button>
+                  <button
+                    disabled={selectedModule.width >= 780}
+                    onClick={() =>
+                      updatePlacedModuleCustomWidth(
+                        selectedModule.instanceId,
+                        Math.min(780, selectedModule.width + 10)
                       )
                     }
                     className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-mono font-bold disabled:opacity-30 disabled:cursor-not-allowed"
